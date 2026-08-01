@@ -1,0 +1,27 @@
+{
+  "name": "supermarket-list",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "expo": "~53.0.27",
+    "expo-asset": "~11.1.7",
+    "expo-build-properties": "~0.14.8",
+    "expo-document-picker": "~13.1.6",
+    "expo-file-system": "~18.1.11",
+    "expo-print": "~14.1.4",
+    "expo-sharing": "~13.1.5",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-native": "0.79.6",
+    "react-native-safe-area-context": "5.4.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0"
+  },
+  "private": true
+}

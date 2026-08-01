@@ -1,0 +1,45 @@
+═══════════════════════════════════════════════════════
+  ΟΔΗΓΙΕΣ BUILD & UPLOAD PLAY STORE
+═══════════════════════════════════════════════════════
+
+ΒΗΜΑ 1 — Build Production AAB (για Play Store)
+────────────────────────────────────────────────
+cd FinalApp_Fixed
+npm install --legacy-peer-deps
+npm install expo-asset@~10.0.10 --legacy-peer-deps
+npm install -g eas-cli
+eas build --platform android --profile production
+
+→ Κατέβασε το .aab αρχείο από το expo.dev
+
+
+ΒΗΜΑ 2 — Play Console
+──────────────────────
+1. play.google.com/console → Νέα εφαρμογή
+2. Όνομα: "Λίστα Αγορών - Smart Shopping"
+3. Γλώσσα: Ελληνικά, Δωρεάν
+
+Store listing:
+  • Τίτλος, Περιγραφή → από play-store-listing.txt
+  • Icon (512x512)   → icon-512x512.png
+  • Feature Graphic  → feature-graphic-1024x500.png
+  • Screenshots      → screenshot-1-home.png
+                       screenshot-2-list.png
+                       screenshot-3-prices.png
+                       screenshot-4-history.png
+
+ΒΗΜΑ 3 — Internal Testing
+──────────────────────────
+Testing → Internal testing → Create release
+→ Ανέβασε το .aab
+→ Δοκίμασε στη συσκευή σου
+
+ΒΗΜΑ 4 — Production Release
+─────────────────────────────
+Production → Create release → Ανέβασε το .aab
+→ Review → Start rollout
+→ Αναμονή 3-7 μέρες για έγκριση
+
+ΣΗΜΕΙΩΣΗ: Πρόσθεσε Privacy Policy URL στο
+play-store-listing.txt πριν ανεβάσεις!
+═══════════════════════════════════════════════════════
