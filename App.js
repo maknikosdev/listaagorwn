@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Linking } from 'react-native';
+import * as Linking from 'expo-linking';
 import { exportListAsPDF } from './src/utils/pdfExport';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
