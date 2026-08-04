@@ -125,12 +125,13 @@ makrisnikose80@gmail.com
 
 
 ═══════════════════════════════════════════════════════
-  KEYSTORE CREDENTIALS (ΦΥΛΑΞΕ ΣΕ ΑΣΦΑΛΕΣ ΜΕΡΟΣ)
+  KEYSTORE INFO
 ═══════════════════════════════════════════════════════
 
+⚠️ Τα credentials (passwords, key alias) αφαιρέθηκαν από εδώ για ασφάλεια.
+Το keystore διαχειρίζεται η Expo/EAS στους δικούς της servers.
+Για να τα δεις: eas credentials --platform android
+
 Keystore file:     @realsin__smlist-fixed-v1.jks
-Keystore password: 2e2eefcb4b91cd8efa226b36a6af90b2
-Key alias:         a144d807daa74e4db3cc70802ca9e99f
-Key password:      9d3ff794c1dbc5edeb55a5e1ba9011ff
 Package name:      com.nikosmakris.smartlist
 Expo account:      realsin

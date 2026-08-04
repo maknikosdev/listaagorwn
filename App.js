@@ -1074,8 +1074,8 @@ function AppContent() {
 
   // Handle opening .json file from external app (WhatsApp, email, etc.)
   useEffect(() => {
-    const handleOpenURL = async ({ url }) => {
-      if (!url || !ready) return;
+    const handleOpenURL = async (url) => {
+      if (!url) return;
       try {
         const text = await FileSystem.readAsStringAsync(
           url.startsWith('content://') ? url : decodeURIComponent(url.replace('file://', '')),
@@ -1090,11 +1090,13 @@ function AppContent() {
       }
     };
 
-    // Check if app was opened with a URL
-    Linking.getInitialURL().then(url => { if (url) handleOpenURL({ url }); });
-    const sub = Linking.addEventListener('url', handleOpenURL);
+    // Capture the initial URL exactly once. `pendingImport` state persists
+    // even if this resolves before `ready` becomes true — the separate
+    // effect below (which depends on `ready`) picks it up once data is loaded.
+    Linking.getInitialURL().then(url => { if (url) handleOpenURL(url); });
+    const sub = Linking.addEventListener('url', (event) => handleOpenURL(event.url));
     return () => sub?.remove();
-  }, [ready]);
+  }, []);
 
   // Process pending import when ready
   useEffect(() => {
