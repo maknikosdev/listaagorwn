@@ -472,10 +472,10 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
       entries = entries.filter(e => selectedProducts.includes(e.name));
     }
 
-    const total = entries.reduce((sum, e) => sum + (e.paidPrice ?? e.price ?? 0), 0);
+    const total = entries.reduce((sum, e) => sum + (e.totalPaid ?? e.paidPrice ?? e.price ?? 0), 0);
     const byProductMap = {};
     entries.forEach(e => {
-      const amt = e.paidPrice ?? e.price ?? 0;
+      const amt = e.totalPaid ?? e.paidPrice ?? e.price ?? 0;
       if (!byProductMap[e.name]) byProductMap[e.name] = { name: e.name, total: 0, count: 0 };
       byProductMap[e.name].total += amt;
       byProductMap[e.name].count += 1;
@@ -1171,9 +1171,15 @@ function AppContent() {
     setListItems(prev=>{
       const item=prev.find(i=>i.id===id); if(!item) return prev;
       const paid = paidPrice !== null ? paidPrice : (price ? parseFloat(price) : null);
+      const qty = item.qty || 1;
+      // totalPaid: what was actually spent on this purchase.
+      // Weighed products: `paid` already reflects the full amount paid for the weight bought.
+      // Piece products: the price field is per unit, so multiply by quantity.
+      const totalPaid = paid === null ? null : (isWeighed ? paid : paid * qty);
       const entry={
         price: paid,
         paidPrice: paid,
+        totalPaid,
         shelfPrice: shelfPrice ? parseFloat(shelfPrice.toFixed(2)) : null,
         brand:brand||'',
         market:market||'',
@@ -1611,11 +1617,14 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                               </View>
                               <View style={{flexDirection:'row',alignItems:'center',gap:4}}>
                                 <Text style={{fontSize:11,color:C.tx2}}>Πλήρωσα:</Text>
-                                <Text style={[st.histPrice,{fontSize:20},isBest&&{color:C.success}]}>{item.paidPrice.toFixed(2)}€</Text>
+                                <Text style={[st.histPrice,{fontSize:20},isBest&&{color:C.success}]}>{(item.totalPaid ?? item.paidPrice).toFixed(2)}€</Text>
                               </View>
                             </>
                           ) : (
-                            <Text style={[st.histPrice,isBest&&{color:C.success}]}>{item.price?`${item.price}€`:'—'}</Text>
+                            <Text style={[st.histPrice,isBest&&{color:C.success}]}>{item.price?`${(item.totalPaid ?? item.price).toFixed(2)}€`:'—'}</Text>
+                          )}
+                          {item.qty>1&&!item.isWeighed&&item.price&&(
+                            <Text style={{fontSize:11,color:C.tx3}}>({item.price}€ × {item.qty})</Text>
                           )}
                         </View>
                         <View style={{flex:1,gap:4}}>
