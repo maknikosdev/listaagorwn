@@ -34,7 +34,8 @@ export function categorizeProduct(name) {
   return bestCat;
 }
 
-export async function importFromPDF() {
+export async function importFromPDF(t) {
+  const tt = t || ((k) => k);
   // Pick file — accept JSON and PDF
   const result = await DocumentPicker.getDocumentAsync({
     type: ['application/json', 'text/plain', 'application/pdf', '*/*'],
@@ -52,7 +53,7 @@ export async function importFromPDF() {
       encoding: FileSystem.EncodingType.UTF8,
     });
   } catch (e) {
-    throw new Error('Δεν ήταν δυνατή η ανάγνωση του αρχείου.');
+    throw new Error(tt('impCouldNotReadFile'));
   }
 
   // ── JSON format (from our "Αποθήκευση λίστας" export) ──
@@ -69,15 +70,13 @@ export async function importFromPDF() {
         }));
       }
     } catch (e) {
-      throw new Error('Μη έγκυρο αρχείο JSON.\nΒεβαιώσου ότι χρησιμοποιείς αρχείο που εξήγαγες από αυτή την εφαρμογή.');
+      throw new Error(tt('impInvalidJsonFile'));
     }
   }
 
   // ── PDF — not supported for import ──
   if (fileName.endsWith('.pdf') || textContent.startsWith('%PDF')) {
-    throw new Error(
-      'Τα PDF δεν μπορούν να εισαχθούν απευθείας.\n\nΓια να αποθηκεύσεις μια λίστα και να την εισάγεις αργότερα, χρησιμοποίησε την επιλογή 💾 "Αποθήκευση λίστας (.json)".'
-    );
+    throw new Error(tt('impPdfNotSupported'));
   }
 
   // ── Plain text — parse line by line ──
@@ -88,7 +87,7 @@ export async function importFromPDF() {
     .filter(l => !l.match(/^(Λίστα|Αρχική|Κατηγορ|Εξαγωγή|Import|Export|Page|Σελίδα|🛒|📄)/i));
 
   if (lines.length === 0) {
-    throw new Error('Δεν βρέθηκαν προϊόντα στο αρχείο.');
+    throw new Error(tt('impNoProductsFound'));
   }
 
   return lines.map(name => ({ name, catId: categorizeProduct(name), qty: 1 }));

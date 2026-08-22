@@ -4,10 +4,19 @@ import * as Sharing from 'expo-sharing';
 /**
  * Exports the current shopping list as a PDF and opens share sheet.
  * Format is structured so it can be re-imported later.
+ *
+ * `i18n` = { lang, t, td, tc } from useLanguage() — passed in by the caller
+ * because this is a plain function, not a React component, so it can't use
+ * the hook directly. The exported PDF renders in whichever language the
+ * app was in when the user tapped export; item names still use the raw
+ * (Greek) identity internally for the hidden re-import JSON, so importing
+ * the same PDF later always categorizes correctly regardless of language.
  */
-export async function exportListAsPDF(listItems, allCategories) {
+export async function exportListAsPDF(listItems, allCategories, i18n) {
+  const { lang = 'el', t = (k) => k, td = (n) => n, tc = (id, n) => n } = i18n || {};
+
   if (!listItems || listItems.length === 0) {
-    throw new Error('Η λίστα είναι άδεια');
+    throw new Error(t('pdfEmptyList'));
   }
 
   // Group by category
@@ -18,15 +27,16 @@ export async function exportListAsPDF(listItems, allCategories) {
     grouped[key].push(item);
   });
 
-  const today = new Date().toLocaleDateString('el-GR');
+  const today = new Date().toLocaleDateString(lang === 'en' ? 'en-GB' : 'el-GR');
 
   // Build HTML
   let rows = '';
   Object.entries(grouped).forEach(([catId, items]) => {
-    const cat = allCategories.find(c => c.id === catId) || { name: 'Άλλα', emoji: '🧩' };
+    const cat = allCategories.find(c => c.id === catId) || { id: 'other', name: t('otherCategory'), emoji: '🧩' };
+    const catDisplayName = tc(cat.id, cat.name);
     rows += `
       <tr class="cat-header">
-        <td colspan="3">${cat.emoji} ${cat.name}</td>
+        <td colspan="3">${cat.emoji} ${escapeHtml(catDisplayName)}</td>
       </tr>
     `;
     items.forEach(item => {
@@ -34,14 +44,16 @@ export async function exportListAsPDF(listItems, allCategories) {
       rows += `
         <tr class="product-row" data-name="${escapeHtml(item.name)}" data-catid="${escapeHtml(item.catId || 'other')}">
           <td class="check">${checked}</td>
-          <td class="name">${escapeHtml(item.name)}</td>
+          <td class="name">${escapeHtml(td(item.name))}</td>
           <td class="qty">${item.qty > 1 ? `x${item.qty}` : ''}</td>
         </tr>
       `;
     });
   });
 
-  // Embed all product data as JSON in a hidden div for re-import
+  // Embed all product data as JSON in a hidden div for re-import.
+  // Always stores the raw (Greek) name — the stable identity — regardless
+  // of display language, so re-importing works correctly either way.
   const importData = JSON.stringify(listItems.map(i => ({
     name: i.name,
     catId: i.catId,
@@ -50,7 +62,7 @@ export async function exportListAsPDF(listItems, allCategories) {
 
   const html = `
 <!DOCTYPE html>
-<html lang="el">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -77,15 +89,15 @@ export async function exportListAsPDF(listItems, allCategories) {
   <div class="header">
     <div class="logo-placeholder">🛒</div>
     <div class="header-text">
-      <h1>Λίστα Αγορών</h1>
-      <p>Εξαγωγή: ${today} · ${listItems.length} προϊόντα</p>
+      <h1>${t('appName')}</h1>
+      <p>${t('exportTitle')}: ${today} · ${listItems.length} ${t('productsWord')}</p>
     </div>
   </div>
   <table>
     ${rows}
   </table>
   <div class="footer">
-    Δημιουργήθηκε από την εφαρμογή Λίστα Αγορών
+    ${t('pdfFooterCreatedBy')}
   </div>
   <!-- IMPORT_DATA_BEGIN
   ${importData}
@@ -99,11 +111,11 @@ export async function exportListAsPDF(listItems, allCategories) {
   if (canShare) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/pdf',
-      dialogTitle: 'Κοινοποίηση Λίστας Αγορών',
+      dialogTitle: t('pdfShareDialogTitle'),
       UTI: 'com.adobe.pdf',
     });
   } else {
-    throw new Error('Η κοινοποίηση δεν είναι διαθέσιμη σε αυτή τη συσκευή');
+    throw new Error(t('pdfSharingUnavailable'));
   }
 }
 

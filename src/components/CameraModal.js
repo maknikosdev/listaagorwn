@@ -7,8 +7,10 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { extractPriceFromImage } from '../utils/priceOCR';
 import { C, S, R } from '../theme/index';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function CameraModal({ visible, onClose, onCapture, mode = 'price' }) {
+  const { t } = useLanguage();
   const [permission, requestPermission] = useCameraPermissions();
   const [loading, setLoading] = useState(false);
   const [hint, setHint] = useState('');
@@ -18,19 +20,19 @@ export default function CameraModal({ visible, onClose, onCapture, mode = 'price
     if (visible) {
       setLoading(false);
       const hints = {
-        price: 'Στόχευσε στο ταμπελάκι τιμής',
-        discount: 'Στόχευσε στο ταμπελάκι έκπτωσης',
-        weight_label: 'Στόχευσε στο ταμπελάκι τιμής/κιλό',
-        weight_receipt: 'Φωτογράφισε ολόκληρο το αποδεικτικό ζυγίσματος',
+        price: t('camHintPrice'),
+        discount: t('camHintDiscount'),
+        weight_label: t('camHintWeightLabel'),
+        weight_receipt: t('camHintWeightReceipt'),
       };
-      setHint(hints[mode] || 'Στόχευσε και φωτογράφισε');
+      setHint(hints[mode] || t('camHintDefault'));
     }
   }, [visible, mode]);
 
   const handleCapture = async () => {
     if (!cameraRef.current || loading) return;
     setLoading(true);
-    setHint('Αναλύω την εικόνα...');
+    setHint(t('camAnalyzing'));
 
     try {
       // Take photo
@@ -57,12 +59,12 @@ export default function CameraModal({ visible, onClose, onCapture, mode = 'price
         onCapture(result);
         onClose();
       } else {
-        setHint('Δεν βρέθηκε τιμή. Δοκίμασε ξανά με καλύτερο φωτισμό.');
+        setHint(t('camNoPriceFound'));
         setLoading(false);
       }
     } catch (e) {
       console.error('Camera capture error:', e);
-      setHint('Σφάλμα. Δοκίμασε ξανά.');
+      setHint(t('camError'));
       setLoading(false);
     }
   };
@@ -84,12 +86,12 @@ export default function CameraModal({ visible, onClose, onCapture, mode = 'price
     return (
       <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
         <View style={st.container}>
-          <Text style={st.permText}>Απαιτείται πρόσβαση στην κάμερα</Text>
+          <Text style={st.permText}>{t('camPermissionNeeded')}</Text>
           <TouchableOpacity style={st.permBtn} onPress={requestPermission}>
-            <Text style={st.permBtnTx}>Δώσε άδεια</Text>
+            <Text style={st.permBtnTx}>{t('camGivePermission')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={st.closeBtn} onPress={onClose}>
-            <Text style={st.closeBtnTx}>Άκυρο</Text>
+            <Text style={st.closeBtnTx}>{t('cancel')}</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -103,13 +105,13 @@ export default function CameraModal({ visible, onClose, onCapture, mode = 'price
           {/* Header */}
           <View style={st.header}>
             <TouchableOpacity onPress={onClose} style={st.closeBtn}>
-              <Text style={st.closeBtnTx}>✕ Κλείσιμο</Text>
+              <Text style={st.closeBtnTx}>{t('camCloseX')}</Text>
             </TouchableOpacity>
             <Text style={st.headerTitle}>
-              {mode === 'price' ? '📷 Τιμή ραφιού'
-            : mode === 'discount' ? '📷 Ποσό έκπτωσης'
-            : mode === 'weight_label' ? '📷 Τιμή / Κιλό'
-            : '📷 Αποδεικτικό ζύγισης'}
+              {mode === 'price' ? t('camTitlePrice')
+            : mode === 'discount' ? t('camTitleDiscount')
+            : mode === 'weight_label' ? t('camTitleWeightLabel')
+            : t('camTitleWeightReceipt')}
             </Text>
           </View>
 
@@ -129,7 +131,7 @@ export default function CameraModal({ visible, onClose, onCapture, mode = 'price
             {loading ? (
               <View style={st.loadingWrap}>
                 <ActivityIndicator color={C.white} size="large" />
-                <Text style={st.loadingTx}>Αναγνώριση τιμής...</Text>
+                <Text style={st.loadingTx}>{t('camRecognizing')}</Text>
               </View>
             ) : (
               <TouchableOpacity style={st.captureBtn} onPress={handleCapture}>

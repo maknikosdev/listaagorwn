@@ -20,7 +20,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.nikosmakris.smartlist",
-      "versionCode": 14,
+      "versionCode": 16,
       "intentFilters": [
         {
           "action": "VIEW",

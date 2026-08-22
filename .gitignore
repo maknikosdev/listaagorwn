@@ -47,4 +47,6 @@ yarn-error.*
 .idea/
 
 # Log files
-*.log
+*.log*.jks 
+store-listing-final.txt 
+android/app/*.keystore 

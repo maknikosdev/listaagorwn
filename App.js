@@ -20,6 +20,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { importFromPDF, categorizeProduct } from './src/utils/pdfImport';
 import { CATEGORIES, DEFAULT_PRODUCTS, FREQUENT, MARKETS } from './src/data/defaultData';
 import { C, S, R } from './src/theme/index';
+import { LanguageProvider, useLanguage } from './src/i18n/LanguageContext';
+import LanguageToggle from './src/components/LanguageToggle';
 
 
 const uid = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
@@ -48,7 +50,7 @@ class ErrorBoundary extends Component {
       return (
         <View style={st.errScreen}>
           <Text style={st.errEmoji}>⚠️</Text>
-          <Text style={st.errTitle}>Κάτι πήγε στραβά</Text>
+          <Text style={st.errTitle}>{t('somethingWrong')}</Text>
           <Text style={st.errMsg}>{this.state.message}</Text>
         </View>
       );
@@ -58,20 +60,22 @@ class ErrorBoundary extends Component {
 }
 
 // ─── AddModal ─────────────────────────────────────────────────────────────────
-function AddModal({ visible, onClose, onSave, initName='', initCatId='other', title='Προσθήκη', showCat=false, mode='add' }) {
+function AddModal({ visible, onClose, onSave, initName='', initCatId='other', title, showCat=false, mode='add', allCategories=[] }) {
+  const { t, td, tc } = useLanguage();
+  const modalTitle = title || t('add');
   const [name, setName] = useState('');
   const [catId, setCatId] = useState(initCatId);
   const inputRef = useRef(null);
   useEffect(() => {
     if (visible) {
       setName(initName); setCatId(initCatId);
-      const t = setTimeout(() => { try { inputRef.current?.focus(); } catch(_){} }, 350);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => { try { inputRef.current?.focus(); } catch(_){} }, 350);
+      return () => clearTimeout(timer);
     }
   }, [visible]);
   const handleSave = () => {
-    const t = name.trim(); if (!t) return;
-    onSave({ name: t, catId }); setName(''); onClose();
+    const trimmed = name.trim(); if (!trimmed) return;
+    onSave({ name: trimmed, catId }); setName(''); onClose();
   };
   if (!visible) return null;
   return (
@@ -80,25 +84,25 @@ function AddModal({ visible, onClose, onSave, initName='', initCatId='other', ti
         <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'} keyboardVerticalOffset={0}>
           <Pressable style={[st.modalSheet, {backgroundColor: C.surface}]} onPress={()=>{}}>
             <View style={st.modalHandle}/>
-            <Text style={st.modalTitle}>{title}</Text>
-            <TextInput ref={inputRef} style={st.textInput} placeholder="Όνομα προϊόντος..." placeholderTextColor={C.tx3} value={name} onChangeText={setName} onSubmitEditing={handleSave} returnKeyType="done" maxLength={80} autoCorrect={false} autoCapitalize="sentences"/>
+            <Text style={st.modalTitle}>{modalTitle}</Text>
+            <TextInput ref={inputRef} style={st.textInput} placeholder={t('productName')} placeholderTextColor={C.tx3} value={name} onChangeText={setName} onSubmitEditing={handleSave} returnKeyType="done" maxLength={80} autoCorrect={false} autoCapitalize="sentences"/>
             {showCat && (
               <>
-                <Text style={st.fieldLabel}>Κατηγορία</Text>
+                <Text style={st.fieldLabel}>{t('category')}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:S.lg}} keyboardShouldPersistTaps="handled">
                   {allCategories.map(cat => (
                     <TouchableOpacity key={cat.id} onPress={()=>setCatId(cat.id)} style={[st.catChip, catId===cat.id&&{backgroundColor:cat.accent,borderColor:cat.accent}]}>
                       <Text style={st.catChipEmoji}>{cat.emoji}</Text>
-                      <Text style={[st.catChipName, catId===cat.id&&{color:C.white}]} numberOfLines={1}>{cat.name}</Text>
+                      <Text style={[st.catChipName, catId===cat.id&&{color:C.white}]} numberOfLines={1}>{tc(cat.id, cat.name)}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </>
             )}
             <View style={st.modalBtns}>
-              <TouchableOpacity style={st.cancelBtn} onPress={onClose}><Text style={st.cancelTx}>Άκυρο</Text></TouchableOpacity>
+              <TouchableOpacity style={st.cancelBtn} onPress={onClose}><Text style={st.cancelTx}>{t('cancel')}</Text></TouchableOpacity>
               <TouchableOpacity style={[st.saveBtn,!name.trim()&&st.saveBtnDis]} onPress={handleSave} disabled={!name.trim()}>
-                <Text style={st.saveTx}>{mode==='edit'?'Αποθήκευση':'Προσθήκη'}</Text>
+                <Text style={st.saveTx}>{mode==='edit'?t('save'):t('add')}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -110,6 +114,7 @@ function AddModal({ visible, onClose, onSave, initName='', initCatId='other', ti
 
 // ─── ActionSheet ──────────────────────────────────────────────────────────────
 function ActionSheet({ visible, onClose, title, actions=[] }) {
+  const { t, td, tc } = useLanguage();
   if (!visible) return null;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent={false}>
@@ -127,7 +132,7 @@ function ActionSheet({ visible, onClose, title, actions=[] }) {
               </React.Fragment>
             ))}
           </View>
-          <TouchableOpacity style={[st.asCancel, {backgroundColor: C.surface}]} onPress={onClose}><Text style={st.asCancelTx}>Άκυρο</Text></TouchableOpacity>
+          <TouchableOpacity style={[st.asCancel, {backgroundColor: C.surface}]} onPress={onClose}><Text style={st.asCancelTx}>{t('cancel')}</Text></TouchableOpacity>
         </View>
       </Pressable>
     </Modal>
@@ -136,6 +141,7 @@ function ActionSheet({ visible, onClose, title, actions=[] }) {
 
 // ─── PriceModal ───────────────────────────────────────────────────────────────
 function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
+  const { t, td, tc } = useLanguage();
   const [price, setPrice] = useState('');
   const [brand, setBrand] = useState('');
   const [market, setMarket] = useState('');
@@ -154,8 +160,8 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
       setPrice(''); setBrand(''); setMarket(''); setCustomMarket('');
       setHasOffer(false); setOfferType('euro'); setOfferValue('');
       setIsWeighed(false); setPricePerKg(''); setFinalPrice('');
-      const t = setTimeout(()=>{ try{priceRef.current?.focus();}catch(_){} },350);
-      return ()=>clearTimeout(t);
+      const timer = setTimeout(()=>{ try{priceRef.current?.focus();}catch(_){} },350);
+      return ()=>clearTimeout(timer);
     }
   },[visible]);
 
@@ -221,7 +227,7 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                 <View style={st.pmRow}>
                   <View style={st.pmCircle}><Text style={st.pmCircleTx}>✓</Text></View>
                   <View style={{flex:1}}>
-                    <Text style={st.modalTitle}>Αγοράστηκε!</Text>
+                    <Text style={st.modalTitle}>{t('purchasedExcl')}</Text>
                     <Text style={{fontSize:13,color:C.tx2,marginTop:2}} numberOfLines={1}>{itemName}</Text>
                   </View>
                 </View>
@@ -229,8 +235,8 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                 {lastEntry?.price ? (
                   <View style={st.lastBox}>
                     <Text style={st.lastTx}>
-                      Τελευταία: {lastEntry.shelfPrice&&lastEntry.paidPrice&&lastEntry.shelfPrice!==lastEntry.paidPrice
-                        ? `Ράφι: ${lastEntry.shelfPrice.toFixed(2)}€ → Πλήρωσες: ${lastEntry.paidPrice.toFixed(2)}€`
+                      {t('lastLabel')} {lastEntry.shelfPrice&&lastEntry.paidPrice&&lastEntry.shelfPrice!==lastEntry.paidPrice
+                        ? `${t('shelfLabel')} ${lastEntry.shelfPrice.toFixed(2)}€ → ${t('youPaidLabel')} ${lastEntry.paidPrice.toFixed(2)}€`
                         : `${lastEntry.price}€`}
                       {lastEntry.weightKg ? ` · ${(lastEntry.weightKg*1000).toFixed(0)}g` : ''}
                       {lastEntry.brand?` · ${lastEntry.brand}`:''}
@@ -244,16 +250,16 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                   <View style={[st.offerCheckbox, isWeighed && st.offerCheckboxOn]}>
                     {isWeighed && <Text style={{color:C.white,fontSize:13,fontWeight:'800'}}>✓</Text>}
                   </View>
-                  <Text style={st.offerLabel}>⚖️  Προϊόν ζύγισης (τιμή/κιλό)</Text>
+                  <Text style={st.offerLabel}>{t('weighedProductToggle')}</Text>
                 </TouchableOpacity>
 
                 {isWeighed ? (
                   <View style={st.offerBox}>
                     {/* Price per kg */}
-                    <Text style={st.fieldLabel}>Τιμή / Κιλό (€/kg)</Text>
+                    <Text style={st.fieldLabel}>{t('pricePerKg')}</Text>
                     <TextInput
                       style={st.textInput}
-                      placeholder="π.χ. 3.99"
+                      placeholder={t('egPrice399')}
                       placeholderTextColor={C.tx3}
                       value={pricePerKg}
                       onChangeText={setPricePerKg}
@@ -261,10 +267,10 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                     />
 
                     {/* Final price paid */}
-                    <Text style={st.fieldLabel}>Τελική τιμή που πλήρωσες (€)</Text>
+                    <Text style={st.fieldLabel}>{t('finalPricePaid')}</Text>
                     <TextInput
                       style={st.textInput}
-                      placeholder="π.χ. 2.15"
+                      placeholder={t('egPrice215')}
                       placeholderTextColor={C.tx3}
                       value={finalPrice}
                       onChangeText={setFinalPrice}
@@ -274,7 +280,7 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                     {/* Computed weight */}
                     {weight !== null && (
                       <View style={st.offerPreview}>
-                        <Text style={st.offerPreviewLabel}>Βάρος:</Text>
+                        <Text style={st.offerPreviewLabel}>{t('weightLabel')}</Text>
                         <Text style={[st.offerPreviewFinal,{fontSize:20}]}>
                           {weight >= 1
                             ? `${weight.toFixed(3)} kg`
@@ -288,11 +294,11 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                 ) : (
                   <>
                     {/* Normal price field */}
-                    <Text style={st.fieldLabel}>Τιμή αγοράς — όσο πλήρωσες (€)</Text>
+                    <Text style={st.fieldLabel}>{t('purchasePriceLabel')}</Text>
                     <TextInput
                       ref={priceRef}
                       style={st.textInput}
-                      placeholder="π.χ. 2.49"
+                      placeholder={t('egPrice249')}
                       placeholderTextColor={C.tx3}
                       value={price}
                       onChangeText={setPrice}
@@ -304,22 +310,22 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                       <View style={[st.offerCheckbox, hasOffer && st.offerCheckboxOn]}>
                         {hasOffer && <Text style={{color:C.white,fontSize:13,fontWeight:'800'}}>✓</Text>}
                       </View>
-                      <Text style={st.offerLabel}>🏷️  Προσφορά</Text>
+                      <Text style={st.offerLabel}>{t('offerLabelIcon')}</Text>
                     </TouchableOpacity>
 
                     {hasOffer && (
                       <View style={st.offerBox}>
                         <View style={st.offerTypeRow}>
                           <TouchableOpacity style={[st.offerTypeBtn, offerType==='euro'&&st.offerTypeBtnOn]} onPress={()=>{setOfferType('euro');setOfferValue('');}}>
-                            <Text style={[st.offerTypeTx, offerType==='euro'&&st.offerTypeTxOn]}>Έκπτωση €</Text>
+                            <Text style={[st.offerTypeTx, offerType==='euro'&&st.offerTypeTxOn]}>{t('discountEuro')}</Text>
                           </TouchableOpacity>
                           <TouchableOpacity style={[st.offerTypeBtn, offerType==='percent'&&st.offerTypeBtnOn]} onPress={()=>{setOfferType('percent');setOfferValue('');}}>
-                            <Text style={[st.offerTypeTx, offerType==='percent'&&st.offerTypeTxOn]}>Έκπτωση %</Text>
+                            <Text style={[st.offerTypeTx, offerType==='percent'&&st.offerTypeTxOn]}>{t('discountPercent')}</Text>
                           </TouchableOpacity>
                         </View>
                         <TextInput
                           style={st.textInput}
-                          placeholder={offerType==='euro'?'π.χ. 0.50 (€ έκπτωση)':'π.χ. 20 (%)'}
+                          placeholder={offerType==='euro'?t('egOfferEuro'):t('egOfferPercent')}
                           placeholderTextColor={C.tx3}
                           value={offerValue}
                           onChangeText={setOfferValue}
@@ -327,10 +333,10 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                         />
                         {shelfPrice !== null && (
                           <View style={st.offerPreview}>
-                            <Text style={st.offerPreviewLabel}>Τιμή ραφιού:</Text>
+                            <Text style={st.offerPreviewLabel}>{t('shelfPriceLabel')}</Text>
                             <Text style={st.offerPreviewFinal}>{shelfPrice.toFixed(2)}€</Text>
                             <Text style={st.offerPreviewArrow}>→</Text>
-                            <Text style={st.offerPreviewLabel}>Πλήρωσες:</Text>
+                            <Text style={st.offerPreviewLabel}>{t('youPaidLabel')}</Text>
                             <Text style={st.offerPreviewOrig}>{price}€</Text>
                           </View>
                         )}
@@ -340,11 +346,11 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                 )}
 
                 {/* BRAND */}
-                <Text style={st.fieldLabel}>Μάρκα</Text>
-                <TextInput style={st.textInput} placeholder="π.χ. Φάγε, Αλφα, Δέλτα..." placeholderTextColor={C.tx3} value={brand} onChangeText={setBrand}/>
+                <Text style={st.fieldLabel}>{t('brand')}</Text>
+                <TextInput style={st.textInput} placeholder={t('egBrandName')} placeholderTextColor={C.tx3} value={brand} onChangeText={setBrand}/>
 
                 {/* MARKET */}
-                <Text style={st.fieldLabel}>Μάρκετ</Text>
+                <Text style={st.fieldLabel}>{t('market')}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:S.lg}} keyboardShouldPersistTaps="handled">
                   {MARKETS.map(mk=>(
                     <TouchableOpacity key={mk} style={[st.mkChip,market===mk&&st.mkChipOn]} onPress={()=>{ const next = market===mk?'':mk; setMarket(next); if(next!=='Άλλο') setCustomMarket(''); }}>
@@ -356,7 +362,7 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                 {market === 'Άλλο' && (
                   <TextInput
                     style={st.textInput}
-                    placeholder="Γράψε το όνομα του μάρκετ..."
+                    placeholder={t('typeMarketName')}
                     placeholderTextColor={C.tx3}
                     value={customMarket}
                     onChangeText={setCustomMarket}
@@ -365,8 +371,8 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
                 )}
 
                 <View style={st.modalBtns}>
-                  <TouchableOpacity style={st.cancelBtn} onPress={skip}><Text style={st.cancelTx}>Παράλειψη</Text></TouchableOpacity>
-                  <TouchableOpacity style={st.saveBtn} onPress={save}><Text style={st.saveTx}>Αποθήκευση 💾</Text></TouchableOpacity>
+                  <TouchableOpacity style={st.cancelBtn} onPress={skip}><Text style={st.cancelTx}>{t('skip')}</Text></TouchableOpacity>
+                  <TouchableOpacity style={st.saveBtn} onPress={save}><Text style={st.saveTx}>{t('saveWithIcon')}</Text></TouchableOpacity>
                 </View>
                 <View style={{height:24}}/>
               </ScrollView>
@@ -378,6 +384,7 @@ function PriceModal({ visible, onClose, onSave, itemName, lastEntry }) {
 }
 
 function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, catalog, FREQUENT }) {
+  const { t, td, tc } = useLanguage();
   const [mode, setMode] = useState('all'); // 'all' | 'category' | 'products'
   const [selectedCatIds, setSelectedCatIds] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
@@ -495,7 +502,7 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
             <View style={st.modalHandle} />
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: S.lg }}>
-                <Text style={st.modalTitle}>📊 Ανάλυση Εξόδων</Text>
+                <Text style={st.modalTitle}>{t('expenseAnalysisIcon')}</Text>
                 <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                   <Text style={{ fontSize: 22, color: C.tx2 }}>✕</Text>
                 </TouchableOpacity>
@@ -504,9 +511,9 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
               {/* Mode selector */}
               <View style={{ flexDirection: 'row', gap: S.sm, marginBottom: S.lg }}>
                 {[
-                  { key: 'all', label: '📋 Όλα' },
-                  { key: 'category', label: '🗂️ Κατηγορία' },
-                  { key: 'products', label: '🔎 Προϊόντα' },
+                  { key: 'all', label:t('allIcon') },
+                  { key: 'category', label:t('categoryIcon') },
+                  { key: 'products', label:t('productsIcon') },
                 ].map(m => (
                   <TouchableOpacity
                     key={m.key}
@@ -519,11 +526,11 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
               </View>
 
               {/* Date range */}
-              <Text style={st.fieldLabel}>Εύρος ημερομηνιών</Text>
+              <Text style={st.fieldLabel}>{t('dateRange')}</Text>
               <View style={{ flexDirection: 'row', gap: S.sm }}>
                 <TextInput
                   style={[st.textInput, { flex: 1 }]}
-                  placeholder="Από (ΗΗ/ΜΜ/ΕΕΕΕ)"
+                  placeholder={t('fromDatePlaceholder')}
                   placeholderTextColor={C.tx3}
                   value={dateFrom}
                   onChangeText={setDateFrom}
@@ -531,7 +538,7 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
                 />
                 <TextInput
                   style={[st.textInput, { flex: 1 }]}
-                  placeholder="Έως (ΗΗ/ΜΜ/ΕΕΕΕ)"
+                  placeholder={t('toDatePlaceholder')}
                   placeholderTextColor={C.tx3}
                   value={dateTo}
                   onChangeText={setDateTo}
@@ -540,11 +547,11 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: S.lg }}>
                 {[
-                  { label: '7 ημέρες', days: 7 },
-                  { label: '30 ημέρες', days: 30 },
-                  { label: '3 μήνες', days: 90 },
-                  { label: 'Φέτος', days: 'year' },
-                  { label: 'Όλες', days: 'all' },
+                  { label:t('days7'), days: 7 },
+                  { label:t('days30'), days: 30 },
+                  { label:t('months3'), days: 90 },
+                  { label:t('thisYear'), days: 'year' },
+                  { label:t('allFem'), days: 'all' },
                 ].map(p => (
                   <TouchableOpacity key={p.label} style={st.mkChip} onPress={() => applyPreset(p.days)}>
                     <Text style={st.mkChipTx}>{p.label}</Text>
@@ -555,7 +562,7 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
               {/* Category selector */}
               {mode === 'category' && (
                 <>
-                  <Text style={st.fieldLabel}>Επίλεξε κατηγορία(-ες)</Text>
+                  <Text style={st.fieldLabel}>{t('selectCategories')}</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: S.sm, marginBottom: S.lg }}>
                     {allCategories.map(cat => (
                       <TouchableOpacity
@@ -563,7 +570,7 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
                         style={[st.mkChip, selectedCatIds.includes(cat.id) && st.mkChipOn, { marginRight: 0 }]}
                         onPress={() => toggleCat(cat.id)}
                       >
-                        <Text style={[st.mkChipTx, selectedCatIds.includes(cat.id) && st.mkChipTxOn]}>{cat.emoji} {cat.name}</Text>
+                        <Text style={[st.mkChipTx, selectedCatIds.includes(cat.id) && st.mkChipTxOn]}>{cat.emoji} {tc(cat.id, cat.name)}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -573,10 +580,10 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
               {/* Product selector */}
               {mode === 'products' && (
                 <>
-                  <Text style={st.fieldLabel}>Επίλεξε προϊόντα</Text>
+                  <Text style={st.fieldLabel}>{t('selectProducts')}</Text>
                   <TextInput
                     style={st.textInput}
-                    placeholder="Αναζήτηση προϊόντος..."
+                    placeholder={t('searchProduct')}
                     placeholderTextColor={C.tx3}
                     value={productSearch}
                     onChangeText={setProductSearch}
@@ -584,7 +591,7 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
                   <View style={{ maxHeight: 200, marginBottom: S.lg }}>
                     <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
                       {filteredProductNames.length === 0 ? (
-                        <Text style={{ color: C.tx3, fontSize: 13, padding: S.sm }}>Δεν βρέθηκαν προϊόντα</Text>
+                        <Text style={{ color: C.tx3, fontSize: 13, padding: S.sm }}>{t('noProductsFound')}</Text>
                       ) : filteredProductNames.map(name => (
                         <TouchableOpacity
                           key={name}
@@ -594,7 +601,7 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
                           <View style={[st.checkbox, selectedProducts.includes(name) && st.checkboxOn, { marginRight: S.sm }]}>
                             {selectedProducts.includes(name) && <Text style={{ color: C.white, fontSize: 12 }}>✓</Text>}
                           </View>
-                          <Text style={{ fontSize: 14, color: C.tx, flex: 1 }} numberOfLines={1}>{name}</Text>
+                          <Text style={{ fontSize: 14, color: C.tx, flex: 1 }} numberOfLines={1}>{td(name)}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -606,23 +613,23 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
               <View style={{ backgroundColor: C.primary, borderRadius: 16, padding: S.lg, marginBottom: S.md }}>
                 {result.empty ? (
                   <Text style={{ color: C.white, fontSize: 14, textAlign: 'center' }}>
-                    {mode === 'category' ? 'Διάλεξε τουλάχιστον μία κατηγορία' : 'Διάλεξε τουλάχιστον ένα προϊόν'}
+                    {mode === 'category' ? t('chooseAtLeastOneCategory') : t('chooseAtLeastOneProduct')}
                   </Text>
                 ) : (
                   <>
-                    <Text style={{ color: '#FFFFFFAA', fontSize: 13, marginBottom: 4 }}>Σύνολο εξόδων</Text>
+                    <Text style={{ color: '#FFFFFFAA', fontSize: 13, marginBottom: 4 }}>{t('totalExpenses')}</Text>
                     <Text style={{ color: C.white, fontSize: 32, fontWeight: '800' }}>{result.total.toFixed(2)} €</Text>
-                    <Text style={{ color: '#FFFFFFCC', fontSize: 13, marginTop: 4 }}>{result.count} αγορές</Text>
+                    <Text style={{ color: '#FFFFFFCC', fontSize: 13, marginTop: 4 }}>{result.count} {t('purchasesWord')}</Text>
                   </>
                 )}
               </View>
 
               {!result.empty && result.byProduct.length > 0 && (
                 <View style={{ marginBottom: S.lg }}>
-                  <Text style={st.fieldLabel}>Ανάλυση ανά προϊόν</Text>
+                  <Text style={st.fieldLabel}>{t('analysisByProduct')}</Text>
                   {result.byProduct.slice(0, 30).map(p => (
                     <View key={p.name} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: C.surfaceAlt }}>
-                      <Text style={{ fontSize: 13, color: C.tx, flex: 1 }} numberOfLines={1}>{p.name} <Text style={{ color: C.tx3 }}>({p.count})</Text></Text>
+                      <Text style={{ fontSize: 13, color: C.tx, flex: 1 }} numberOfLines={1}>{td(p.name)} <Text style={{ color: C.tx3 }}>({p.count})</Text></Text>
                       <Text style={{ fontSize: 13, fontWeight: '700', color: C.tx }}>{p.total.toFixed(2)} €</Text>
                     </View>
                   ))}
@@ -630,7 +637,7 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
               )}
 
               <TouchableOpacity style={st.saveBtn} onPress={onClose}>
-                <Text style={st.saveTx}>Κλείσιμο</Text>
+                <Text style={st.saveTx}>{t('close')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </Pressable>
@@ -641,6 +648,7 @@ function ExpenseAnalysisModal({ visible, onClose, priceHistory, allCategories, c
 }
 
 function NewCategoryModal({ visible, onClose, onSave }) {
+  const { t, td, tc } = useLanguage();
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('📁');
   const inputRef = useRef(null);
@@ -648,8 +656,8 @@ function NewCategoryModal({ visible, onClose, onSave }) {
   useEffect(() => {
     if (visible) {
       setName(''); setEmoji('📁');
-      const t = setTimeout(() => { try { inputRef.current?.focus(); } catch(_){} }, 350);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => { try { inputRef.current?.focus(); } catch(_){} }, 350);
+      return () => clearTimeout(timer);
     }
   }, [visible]);
 
@@ -666,13 +674,13 @@ function NewCategoryModal({ visible, onClose, onSave }) {
         <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'}>
           <Pressable style={st.modalSheet} onPress={()=>{}}>
             <View style={st.modalHandle}/>
-            <Text style={st.modalTitle}>Νέα Κατηγορία</Text>
+            <Text style={st.modalTitle}>{t('newCategory')}</Text>
 
-            <Text style={st.fieldLabel}>Όνομα κατηγορίας</Text>
+            <Text style={st.fieldLabel}>{t('categoryName')}</Text>
             <TextInput
               ref={inputRef}
               style={st.textInput}
-              placeholder="π.χ. Βιταμίνες, Baby, Κατοικίδια..."
+              placeholder={t('egCategoryName')}
               placeholderTextColor={C.tx3}
               value={name}
               onChangeText={setName}
@@ -682,7 +690,7 @@ function NewCategoryModal({ visible, onClose, onSave }) {
               autoCapitalize="sentences"
             />
 
-            <Text style={st.fieldLabel}>Εικονίδιο</Text>
+            <Text style={st.fieldLabel}>{t('icon')}</Text>
             <View style={st.emojiGrid}>
               {EMOJI_OPTIONS.map(e => (
                 <TouchableOpacity
@@ -697,14 +705,14 @@ function NewCategoryModal({ visible, onClose, onSave }) {
 
             <View style={st.modalBtns}>
               <TouchableOpacity style={st.cancelBtn} onPress={onClose}>
-                <Text style={st.cancelTx}>Άκυρο</Text>
+                <Text style={st.cancelTx}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[st.saveBtn, !name.trim() && st.saveBtnDis]}
                 onPress={save}
                 disabled={!name.trim()}
               >
-                <Text style={st.saveTx}>Δημιουργία {emoji}</Text>
+                <Text style={st.saveTx}>{t('createWord')} {emoji}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -717,12 +725,13 @@ function NewCategoryModal({ visible, onClose, onSave }) {
 
 // ─── EditCategoryModal ────────────────────────────────────────────────────────
 function EditCategoryModal({ visible, onClose, onSave, onDelete, category }) {
+  const { t, td, tc } = useLanguage();
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('📁');
 
   useEffect(() => {
     if (visible && category) {
-      setName(category.name);
+      setName(tc(category.id, category.name));
       setEmoji(category.emoji || '📁');
     }
   }, [visible, category]);
@@ -740,12 +749,12 @@ function EditCategoryModal({ visible, onClose, onSave, onDelete, category }) {
         <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'}>
           <Pressable style={st.modalSheet} onPress={()=>{}}>
             <View style={st.modalHandle}/>
-            <Text style={st.modalTitle}>Επεξεργασία Κατηγορίας</Text>
+            <Text style={st.modalTitle}>{t('editCategory')}</Text>
 
-            <Text style={st.fieldLabel}>Όνομα κατηγορίας</Text>
+            <Text style={st.fieldLabel}>{t('categoryName')}</Text>
             <TextInput
               style={st.textInput}
-              placeholder="Όνομα..."
+              placeholder={t('namePh')}
               placeholderTextColor={C.tx3}
               value={name}
               onChangeText={setName}
@@ -755,7 +764,7 @@ function EditCategoryModal({ visible, onClose, onSave, onDelete, category }) {
               autoCapitalize="sentences"
             />
 
-            <Text style={st.fieldLabel}>Εικονίδιο</Text>
+            <Text style={st.fieldLabel}>{t('icon')}</Text>
             <View style={st.emojiGrid}>
               {EMOJI_OPTIONS.map(e => (
                 <TouchableOpacity
@@ -770,14 +779,14 @@ function EditCategoryModal({ visible, onClose, onSave, onDelete, category }) {
 
             <View style={st.modalBtns}>
               <TouchableOpacity style={st.cancelBtn} onPress={onClose}>
-                <Text style={st.cancelTx}>Άκυρο</Text>
+                <Text style={st.cancelTx}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[st.saveBtn, !name.trim() && st.saveBtnDis]}
                 onPress={save}
                 disabled={!name.trim()}
               >
-                <Text style={st.saveTx}>Αποθήκευση</Text>
+                <Text style={st.saveTx}>{t('save')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -789,7 +798,7 @@ function EditCategoryModal({ visible, onClose, onSave, onDelete, category }) {
                   setTimeout(() => onDelete(), 300);
                 }}
               >
-                <Text style={[st.cancelTx, {color: C.danger}]}>🗑️ Διαγραφή κατηγορίας</Text>
+                <Text style={[st.cancelTx, {color: C.danger}]}>{t('deleteCategoryIcon')}</Text>
               </TouchableOpacity>
             )}
           </Pressable>
@@ -802,6 +811,7 @@ function EditCategoryModal({ visible, onClose, onSave, onDelete, category }) {
 
 // ─── QtyPickerModal ───────────────────────────────────────────────────────────
 function QtyPickerModal({ visible, onClose, onAdd, productName }) {
+  const { t, td, tc } = useLanguage();
   const [mode, setMode] = useState('pieces'); // 'pieces' | 'weight'
   const [qty, setQty] = useState(1);
   const [kg, setKg] = useState('');
@@ -825,8 +835,8 @@ function QtyPickerModal({ visible, onClose, onAdd, productName }) {
       <Pressable style={st.modalOverlay} onPress={onClose}>
         <Pressable style={st.modalSheet} onPress={()=>{}}>
           <View style={st.modalHandle}/>
-          <Text style={st.modalTitle}>Προσθήκη στη λίστα</Text>
-          <Text style={{fontSize:14,color:C.tx2,marginBottom:S.lg}} numberOfLines={1}>{productName}</Text>
+          <Text style={st.modalTitle}>{t('addToList')}</Text>
+          <Text style={{fontSize:14,color:C.tx2,marginBottom:S.lg}} numberOfLines={1}>{td(productName)}</Text>
 
           {/* Mode toggle */}
           <View style={st.offerTypeRow}>
@@ -834,13 +844,13 @@ function QtyPickerModal({ visible, onClose, onAdd, productName }) {
               style={[st.offerTypeBtn, mode==='pieces' && st.offerTypeBtnOn]}
               onPress={()=>setMode('pieces')}
             >
-              <Text style={[st.offerTypeTx, mode==='pieces' && st.offerTypeTxOn]}>📦 Τεμάχια</Text>
+              <Text style={[st.offerTypeTx, mode==='pieces' && st.offerTypeTxOn]}>{t('piecesIcon')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[st.offerTypeBtn, mode==='weight' && st.offerTypeBtnOn]}
               onPress={()=>setMode('weight')}
             >
-              <Text style={[st.offerTypeTx, mode==='weight' && st.offerTypeTxOn]}>⚖️ Κιλά</Text>
+              <Text style={[st.offerTypeTx, mode==='weight' && st.offerTypeTxOn]}>{t('kilos')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -861,14 +871,14 @@ function QtyPickerModal({ visible, onClose, onAdd, productName }) {
                   <Text style={st.qtyLargeTx}>+</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={{color:C.tx3,fontSize:12,marginTop:S.md}}>τεμάχια</Text>
+              <Text style={{color:C.tx3,fontSize:12,marginTop:S.md}}>{t('piecesWord')}</Text>
             </View>
           ) : (
             <View style={{paddingVertical:S.lg}}>
-              <Text style={st.fieldLabel}>Ποσότητα (kg) — προαιρετικό</Text>
+              <Text style={st.fieldLabel}>{t('quantityKgOptional')}</Text>
               <TextInput
                 style={st.textInput}
-                placeholder="π.χ. 0.500"
+                placeholder={t('egWeight')}
                 placeholderTextColor={C.tx3}
                 value={kg}
                 onChangeText={setKg}
@@ -876,17 +886,17 @@ function QtyPickerModal({ visible, onClose, onAdd, productName }) {
                 autoFocus
               />
               <Text style={{color:C.tx3,fontSize:12,marginTop:-S.sm,marginBottom:S.md}}>
-                Μπορείς να συμπληρώσεις τα κιλά και αργότερα
+                {t('canFillWeightLater')}
               </Text>
             </View>
           )}
 
           <View style={st.modalBtns}>
             <TouchableOpacity style={st.cancelBtn} onPress={onClose}>
-              <Text style={st.cancelTx}>Άκυρο</Text>
+              <Text style={st.cancelTx}>{t('cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={st.saveBtn} onPress={handleAdd}>
-              <Text style={st.saveTx}>Προσθήκη ✓</Text>
+              <Text style={st.saveTx}>{t('addedCheck')}</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -897,6 +907,7 @@ function QtyPickerModal({ visible, onClose, onAdd, productName }) {
 
 // ─── EditListItemModal ─────────────────────────────────────────────────────────
 function EditListItemModal({ visible, onClose, onSave, item }) {
+  const { t, td, tc } = useLanguage();
   const [name, setName] = useState('');
   const [qty, setQty] = useState(1);
   const [isWeighed, setIsWeighed] = useState(false);
@@ -904,7 +915,7 @@ function EditListItemModal({ visible, onClose, onSave, item }) {
 
   useEffect(() => {
     if (visible && item) {
-      setName(item.name || '');
+      setName(td(item.name || ''));
       setQty(item.qty || 1);
       setIsWeighed(item.isWeighed || false);
       setKgAmount(item.kgAmount ? String(item.kgAmount) : '');
@@ -928,14 +939,14 @@ function EditListItemModal({ visible, onClose, onSave, item }) {
         <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'}>
           <Pressable style={st.modalSheet} onPress={()=>{}}>
             <View style={st.modalHandle}/>
-            <Text style={st.modalTitle}>Επεξεργασία</Text>
+            <Text style={st.modalTitle}>{t('edit')}</Text>
 
-            <Text style={st.fieldLabel}>Όνομα</Text>
+            <Text style={st.fieldLabel}>{t('name')}</Text>
             <TextInput
               style={st.textInput}
               value={name}
               onChangeText={setName}
-              placeholder="Όνομα προϊόντος"
+              placeholder={t('productNamePh')}
               placeholderTextColor={C.tx3}
               returnKeyType="done"
               maxLength={80}
@@ -947,19 +958,19 @@ function EditListItemModal({ visible, onClose, onSave, item }) {
                 style={[st.offerTypeBtn, !isWeighed && st.offerTypeBtnOn]}
                 onPress={()=>{ Keyboard.dismiss(); setIsWeighed(false); }}
               >
-                <Text style={[st.offerTypeTx, !isWeighed && st.offerTypeTxOn]}>📦 Τεμάχια</Text>
+                <Text style={[st.offerTypeTx, !isWeighed && st.offerTypeTxOn]}>{t('piecesIcon')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[st.offerTypeBtn, isWeighed && st.offerTypeBtnOn]}
                 onPress={()=>{ Keyboard.dismiss(); setIsWeighed(true); }}
               >
-                <Text style={[st.offerTypeTx, isWeighed && st.offerTypeTxOn]}>⚖️ Κιλά</Text>
+                <Text style={[st.offerTypeTx, isWeighed && st.offerTypeTxOn]}>{t('kilos')}</Text>
               </TouchableOpacity>
             </View>
 
             {!isWeighed ? (
               <View>
-                <Text style={st.fieldLabel}>Ποσότητα (τεμάχια)</Text>
+                <Text style={st.fieldLabel}>{t('quantityPieces')}</Text>
                 <View style={{flexDirection:'row',alignItems:'center',gap:S.lg,marginBottom:S.lg}}>
                   <TouchableOpacity style={st.qtyLargeBtn} onPress={()=>setQty(q=>Math.max(1,q-1))}>
                     <Text style={st.qtyLargeTx}>−</Text>
@@ -972,12 +983,12 @@ function EditListItemModal({ visible, onClose, onSave, item }) {
               </View>
             ) : (
               <View>
-                <Text style={st.fieldLabel}>Ποσότητα (kg) — προαιρετικό</Text>
+                <Text style={st.fieldLabel}>{t('quantityKgOptional')}</Text>
                 <TextInput
                   style={st.textInput}
                   value={kgAmount}
                   onChangeText={setKgAmount}
-                  placeholder="π.χ. 0.500"
+                  placeholder={t('egWeight')}
                   placeholderTextColor={C.tx3}
                   keyboardType="decimal-pad"
                 />
@@ -986,10 +997,10 @@ function EditListItemModal({ visible, onClose, onSave, item }) {
 
             <View style={st.modalBtns}>
               <TouchableOpacity style={st.cancelBtn} onPress={onClose}>
-                <Text style={st.cancelTx}>Άκυρο</Text>
+                <Text style={st.cancelTx}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={st.saveBtn} onPress={save}>
-                <Text style={st.saveTx}>Αποθήκευση</Text>
+                <Text style={st.saveTx}>{t('save')}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -1003,6 +1014,7 @@ function EditListItemModal({ visible, onClose, onSave, item }) {
 // MAIN APP
 // ═════════════════════════════════════════════════════════════════════════════
 function AppContent() {
+  const { t, td, tc, lang } = useLanguage();
   const insets = useSafeAreaInsets();
   const [ready, setReady] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
@@ -1062,8 +1074,8 @@ function AppContent() {
   // ── Splash screen: show for 2 seconds after data loads ────────────────────
   useEffect(() => {
     if (!ready) return;
-    const t = setTimeout(() => setShowSplash(false), 2000);
-    return () => clearTimeout(t);
+    const splashTimer = setTimeout(() => setShowSplash(false), 2000);
+    return () => clearTimeout(splashTimer);
   }, [ready]);
 
   // ── Save data ──────────────────────────────────────────────────────────────
@@ -1102,12 +1114,12 @@ function AppContent() {
   useEffect(() => {
     if (!pendingImport || !ready) return;
     Alert.alert(
-      '📥 Εισαγωγή λίστας',
-      `Βρέθηκε λίστα με ${pendingImport.length} προϊόντα. Να εισαχθεί;`,
+      t('importListTitle'),
+      t('foundListMsg').replace('{n}', pendingImport.length),
       [
-        { text: 'Άκυρο', style: 'cancel', onPress: () => setPendingImport(null) },
+        { text: t('cancel'), style: 'cancel', onPress: () => setPendingImport(null) },
         {
-          text: 'Εισαγωγή',
+          text: t('importAction'),
           onPress: () => {
             let added = 0;
             pendingImport.forEach(({ name, catId, qty, isWeighed, kgAmount }) => {
@@ -1118,7 +1130,7 @@ function AppContent() {
               }
             });
             setPendingImport(null);
-            Alert.alert('✅ Επιτυχία', `Προστέθηκαν ${added} προϊόντα!`, [{ text: 'OK', onPress: () => goTab('list') }]);
+            Alert.alert(t('successTitle'), t('addedNItems').replace('{n}', added), [{ text: 'OK', onPress: () => goTab('list') }]);
           }
         }
       ]
@@ -1254,14 +1266,14 @@ function AppContent() {
   const handleExportPDF = useCallback(async () => {
     setShowPdfMenu(false);
     if (listItems.length === 0) {
-      Alert.alert('Άδεια λίστα', 'Πρόσθεσε προϊόντα στη λίστα πριν την εξαγωγή.');
+      Alert.alert(t('emptyListTitleAlert'), t('addProductsBeforeExport'));
       return;
     }
     setPdfLoading(true);
     try {
-      await exportListAsPDF(listItems, allCategories);
+      await exportListAsPDF(listItems, allCategories, { lang, t, td, tc });
     } catch (e) {
-      Alert.alert('Σφάλμα', e.message || 'Δεν ήταν δυνατή η εξαγωγή PDF.');
+      Alert.alert(t('errorTitle'), e.message || t('couldNotExportPdf'));
     } finally {
       setPdfLoading(false);
     }
@@ -1270,7 +1282,7 @@ function AppContent() {
   const handleExportJSON = useCallback(async () => {
     setShowPdfMenu(false);
     if (listItems.length === 0) {
-      Alert.alert('Άδεια λίστα', 'Πρόσθεσε προϊόντα στη λίστα πριν την εξαγωγή.');
+      Alert.alert(t('emptyListTitleAlert'), t('addProductsBeforeExport'));
       return;
     }
     setPdfLoading(true);
@@ -1282,12 +1294,12 @@ function AppContent() {
       await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(fileUri, { mimeType: 'application/json', dialogTitle: 'Αποθήκευση Λίστας' });
+        await Sharing.shareAsync(fileUri, { mimeType: 'application/json', dialogTitle: t('saveListDialogTitle') });
       } else {
-        Alert.alert('Εξαγωγή', `Αποθηκεύτηκε: ${fileName}`);
+        Alert.alert(t('exportTitle'), `${t('savedAsPrefix')} ${fileName}`);
       }
     } catch (e) {
-      Alert.alert('Σφάλμα', e.message || 'Δεν ήταν δυνατή η εξαγωγή.');
+      Alert.alert(t('errorTitle'), e.message || t('couldNotExport'));
     } finally {
       setPdfLoading(false);
     }
@@ -1310,12 +1322,12 @@ function AppContent() {
       await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(fileUri, { mimeType: 'application/json', dialogTitle: 'Αποθήκευση Backup' });
+        await Sharing.shareAsync(fileUri, { mimeType: 'application/json', dialogTitle: t('saveBackupDialogTitle') });
       } else {
-        Alert.alert('Backup', `Αποθηκεύτηκε: ${fileName}`);
+        Alert.alert(t('backupTitle'), `${t('savedAsPrefix')} ${fileName}`);
       }
     } catch (e) {
-      Alert.alert('Σφάλμα', e.message || 'Δεν ήταν δυνατή η εξαγωγή.');
+      Alert.alert(t('errorTitle'), e.message || t('couldNotExport'));
     } finally {
       setPdfLoading(false);
     }
@@ -1332,26 +1344,26 @@ function AppContent() {
       const text = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
       const data = JSON.parse(text);
       if (data.type !== 'smlist_backup') {
-        Alert.alert('Μη έγκυρο αρχείο', 'Αυτό το αρχείο δεν είναι backup κατηγοριών/ιστορικού.');
+        Alert.alert(t('invalidFileTitle'), t('notBackupFileMsg'));
         return;
       }
       Alert.alert(
-        'Επαναφορά Backup',
-        'Θα αντικατασταθούν οι κατηγορίες, ο κατάλογος προϊόντων και το ιστορικό τιμών σου με αυτά του αρχείου. Να συνεχίσω;',
+        t('restoreBackup'),
+        t('restoreBackupConfirmMsg'),
         [
-          { text: 'Άκυρο', style: 'cancel' },
-          { text: 'Επαναφορά', style: 'destructive', onPress: () => {
+          { text: t('cancel'), style: 'cancel' },
+          { text: t('restoreAction'), style: 'destructive', onPress: () => {
             if (data.catalog) setCatalog(data.catalog);
             if (data.customCategories) setCustomCategories(data.customCategories);
             if (data.categoryOverrides) setCategoryOverrides(data.categoryOverrides);
             if (data.usageCounts) setUsageCounts(data.usageCounts);
             if (data.priceHistory) setPriceHistory(data.priceHistory);
-            Alert.alert('Έτοιμο', 'Το backup επαναφέρθηκε.');
+            Alert.alert(t('doneTitle'), t('backupRestoredMsg'));
           }},
         ]
       );
     } catch (e) {
-      Alert.alert('Σφάλμα', e.message || 'Δεν ήταν δυνατή η εισαγωγή.');
+      Alert.alert(t('errorTitle'), e.message || t('couldNotImport'));
     } finally {
       setPdfLoading(false);
     }
@@ -1362,7 +1374,7 @@ function AppContent() {
     setShowPdfMenu(false);
     setPdfLoading(true);
     try {
-      const items = await importFromPDF();
+      const items = await importFromPDF(t);
       if (!items) return; // user cancelled
 
       let added = 0;
@@ -1386,14 +1398,14 @@ function AppContent() {
       });
 
       Alert.alert(
-        '✅ Εισαγωγή επιτυχής',
-        `Προστέθηκαν ${added} προϊόντα στη λίστα.` +
+        t('importSuccessTitle'),
+        t('addedNItemsToList').replace('{n}', added) +
         (alreadyInList > 0 ? `
-${alreadyInList} ήταν ήδη στη λίστα.` : ''),
-        [{ text: 'Ωραία!', onPress: () => goTab('list') }]
+${t('alreadyInListMsg').replace('{n}', alreadyInList)}` : ''),
+        [{ text: t('niceExcl'), onPress: () => goTab('list') }]
       );
     } catch (e) {
-      Alert.alert('Σφάλμα εισαγωγής', e.message || 'Δεν ήταν δυνατή η εισαγωγή αρχείου.');
+      Alert.alert(t('importErrorTitle'), e.message || t('couldNotImportFile'));
     } finally {
       setPdfLoading(false);
     }
@@ -1460,7 +1472,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
     const grouped={};
     listItems.forEach(item=>{ if(!grouped[item.catId]) grouped[item.catId]=[]; grouped[item.catId].push(item); });
     return Object.entries(grouped).map(([catId,items])=>{
-      const cat=allCategories.find(c=>c.id===catId)||{name:'Άλλα',emoji:'🧩',color:'#F3E5F5',accent:'#9C27B0'};
+      const cat=allCategories.find(c=>c.id===catId)||{id:'other',name:t('otherCategory'),emoji:'🧩',color:'#F3E5F5',accent:'#9C27B0'};
       return {...cat,data:[...items].sort((a,b)=>Number(a.checked)-Number(b.checked))};
     });
   },[listItems, allCategories]);
@@ -1480,8 +1492,8 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
           style={st.splashLogo}
           resizeMode="contain"
         />
-        <Text style={st.splashTitle}>Λίστα Αγορών</Text>
-        <Text style={st.splashSub}>Οργάνωσε τα ψώνια σου εύκολα</Text>
+        <Text style={st.splashTitle}>{t('appName')}</Text>
+        <Text style={st.splashSub}>{t('organizeShoppingEasily')}</Text>
         {ready && (
           <ActivityIndicator
             color={C.primary}
@@ -1505,7 +1517,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
             <TouchableOpacity onPress={goBack} hitSlop={{top:12,bottom:12,left:12,right:12}}>
               <Text style={st.backTx}>‹</Text>
             </TouchableOpacity>
-            <Text style={st.navTitle} numberOfLines={1}>{activeCat.emoji} {activeCat.name}</Text>
+            <Text style={st.navTitle} numberOfLines={1}>{activeCat.emoji} {tc(activeCat.id, activeCat.name)}</Text>
             <TouchableOpacity onPress={()=>setShowAddCatalog(true)} hitSlop={{top:12,bottom:12,left:12,right:12}}>
               <Text style={st.navPlus}>＋</Text>
             </TouchableOpacity>
@@ -1513,9 +1525,9 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
           <View style={[st.hero,{backgroundColor:activeCat.color}]}>
             <Text style={{fontSize:42}}>{activeCat.emoji}</Text>
             <View>
-              <Text style={st.heroName}>{activeCat.name}</Text>
+              <Text style={st.heroName}>{tc(activeCat.id, activeCat.name)}</Text>
               <Text style={[st.heroSub,{color:activeCat.accent}]}>
-                {activeProducts.length} προϊόντα · {activeProducts.filter(p=>isInList(p.id)).length} στη λίστα
+                {activeProducts.length} {t('productsWord')} · {activeProducts.filter(p=>isInList(p.id)).length} {t('inListWord')}
               </Text>
             </View>
           </View>
@@ -1528,10 +1540,10 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
             ListEmptyComponent={()=>(
               <View style={st.emptyWrap}>
                 <Text style={st.emptyEmoji}>📭</Text>
-                <Text style={st.emptyTitle}>Δεν υπάρχουν προϊόντα</Text>
-                <Text style={[st.emptySub,{marginBottom:S.xl}]}>Πάτα ＋ για να προσθέσεις το πρώτο</Text>
+                <Text style={st.emptyTitle}>{t('noProducts')}</Text>
+                <Text style={[st.emptySub,{marginBottom:S.xl}]}>{t('tapPlusToAddFirst')}</Text>
                 <TouchableOpacity style={st.emptyBtn} onPress={()=>setShowAddCatalog(true)}>
-                  <Text style={st.emptyBtnTx}>＋ Προσθήκη προϊόντος</Text>
+                  <Text style={st.emptyBtnTx}>{t('plusAddProduct')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1546,8 +1558,8 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                 >
                   <View style={[st.productBar,{backgroundColor:inList?activeCat.accent:activeCat.accent+'30'}]}/>
                   <View style={st.productInfo}>
-                    <Text style={[st.productName,inList&&st.productNameIn]}>{item.name}</Text>
-                    {inList&&<Text style={st.productTag}>Στη λίστα σου ✓</Text>}
+                    <Text style={[st.productName,inList&&st.productNameIn]}>{td(item.name)}</Text>
+                    {inList&&<Text style={st.productTag}>{t('inYourListCheck')}</Text>}
                   </View>
                   <TouchableOpacity style={[st.productBtn,inList&&{backgroundColor:activeCat.accent}]}
                     onPress={()=>{ if(!inList) promptAddToList(item.name,item.catId,item.id); }}
@@ -1569,18 +1581,18 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
           <View style={{flex:1}}>
             <View style={[st.navBar, {backgroundColor: C.primary, paddingTop: insets.top + 8}]}>
               <TouchableOpacity onPress={goBack} hitSlop={{top:12,bottom:12,left:12,right:12}}><Text style={st.backTx}>‹</Text></TouchableOpacity>
-              <Text style={st.navTitle} numberOfLines={1}>{priceHistoryName}</Text>
+              <Text style={st.navTitle} numberOfLines={1}>{td(priceHistoryName)}</Text>
               <View style={{width:32}}/>
             </View>
             <View style={{backgroundColor:C.primaryMid,paddingHorizontal:S.xl,paddingVertical:S.sm}}>
-              <Text style={{color:C.primarySoft,fontSize:12}}>Ιστορικό τιμών · {history.length} αγορές · πάτησε παρατεταμένα για διαγραφή</Text>
-              {cheapest?.price&&<Text style={{color:C.white,fontSize:13,fontWeight:'700',marginTop:2}}>🏆 Φθηνότερη: {cheapest.price}€{cheapest.market?` · ${cheapest.market}`:''}</Text>}
+              <Text style={{color:C.primarySoft,fontSize:12}}>{t('priceHistory')} · {history.length} {t('purchasesWord')} · {t('longPressToDelete')}</Text>
+              {cheapest?.price&&<Text style={{color:C.white,fontSize:13,fontWeight:'700',marginTop:2}}>{t('cheapestLabel')} {cheapest.price}€{cheapest.market?` · ${cheapest.market}`:''}</Text>}
             </View>
             {history.length===0?(
               <View style={st.emptyWrap}>
                 <Text style={st.emptyEmoji}>📊</Text>
-                <Text style={st.emptyTitle}>Δεν υπάρχουν δεδομένα</Text>
-                <Text style={st.emptySub}>Καταχώρησε τιμή την επόμενη φορά</Text>
+                <Text style={st.emptyTitle}>{t('noData')}</Text>
+                <Text style={st.emptySub}>{t('logPriceNextTime')}</Text>
               </View>
             ):(
               <FlatList data={history} keyExtractor={(_,i)=>String(i)}
@@ -1594,29 +1606,29 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                       style={[st.histCard,isBest&&{borderWidth:2,borderColor:C.success}]}
                       onLongPress={()=>{
                         Alert.alert(
-                          'Διαγραφή καταχώρησης',
-                          `Να διαγραφεί η αγορά της ${item.date};`,
+                          t('deleteEntryTitle'),
+                          t('deletePurchaseOfDate').replace('{date}', item.date),
                           [
-                            {text:'Άκυρο',style:'cancel'},
-                            {text:'Διαγραφή',style:'destructive',onPress:()=>deleteHistoryEntry(priceHistoryName, index)},
+                            {text:t('cancel'),style:'cancel'},
+                            {text:t('delete'),style:'destructive',onPress:()=>deleteHistoryEntry(priceHistoryName, index)},
                           ]
                         );
                       }}
                       activeOpacity={0.85}
                       delayLongPress={500}
                     >
-                      {isBest&&<View style={st.bestBadge}><Text style={st.bestBadgeTx}>🏆 Φθηνότερη αγορά</Text></View>}
-                      {hasOffer&&<View style={[st.bestBadge,{backgroundColor:'#FF9800',marginBottom:S.sm}]}><Text style={st.bestBadgeTx}>🏷️ Προσφορά {item.offerType==='percent'?`-${item.offerValue}%`:`-${item.offerValue}€`}</Text></View>}
+                      {isBest&&<View style={st.bestBadge}><Text style={st.bestBadgeTx}>{t('cheapestPurchase')}</Text></View>}
+                      {hasOffer&&<View style={[st.bestBadge,{backgroundColor:'#FF9800',marginBottom:S.sm}]}><Text style={st.bestBadgeTx}>{t('offerBadge')} {item.offerType==='percent'?`-${item.offerValue}%`:`-${item.offerValue}€`}</Text></View>}
                       <View style={{flexDirection:'row',gap:S.lg,alignItems:'flex-start'}}>
                         <View style={{minWidth:100,gap:4}}>
                           {hasOffer ? (
                             <>
                               <View style={{flexDirection:'row',alignItems:'center',gap:4}}>
-                                <Text style={{fontSize:11,color:C.tx3}}>Ράφι:</Text>
+                                <Text style={{fontSize:11,color:C.tx3}}>{t('shelfLabel')}</Text>
                                 <Text style={{fontSize:15,color:C.tx3,textDecorationLine:'line-through',fontWeight:'600'}}>{item.shelfPrice.toFixed(2)}€</Text>
                               </View>
                               <View style={{flexDirection:'row',alignItems:'center',gap:4}}>
-                                <Text style={{fontSize:11,color:C.tx2}}>Πλήρωσα:</Text>
+                                <Text style={{fontSize:11,color:C.tx2}}>{t('iPaidLabel')}</Text>
                                 <Text style={[st.histPrice,{fontSize:20},isBest&&{color:C.success}]}>{(item.totalPaid ?? item.paidPrice).toFixed(2)}€</Text>
                               </View>
                             </>
@@ -1631,7 +1643,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                           {item.brand?<Text style={st.histDetail}>🏷️  {item.brand}</Text>:null}
                           {item.market?<Text style={st.histDetail}>🏪  {item.market}</Text>:null}
                           <Text style={[st.histDetail,{color:C.tx3}]}>📅  {item.date}</Text>
-                          {item.qty>1&&<Text style={[st.histDetail,{color:C.tx3}]}>x{item.qty} τεμάχια</Text>}
+                          {item.qty>1&&<Text style={[st.histDetail,{color:C.tx3}]}>x{item.qty} {t('piecesWord')}</Text>}
                           {item.isWeighed&&item.weightKg&&<Text style={st.histDetail}>⚖️  {item.weightKg>=1?`${item.weightKg.toFixed(3)} kg`:`${(item.weightKg*1000).toFixed(0)} g`}</Text>}
                           {item.isWeighed&&item.pricePerKg&&<Text style={[st.histDetail,{color:C.tx3}]}>💰 {item.pricePerKg}€/kg</Text>}
                         </View>
@@ -1658,10 +1670,11 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
             <ScrollView style={{flex:1,backgroundColor:C.bg}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{backgroundColor:C.bg}}>
               <View style={[st.homeHdr, {paddingTop: insets.top + S.xl}]}>
                 <View style={{flex:1}}>
-                  <Text style={st.homeGreet}>Καλημέρα! 👋</Text>
-                  <Text style={st.homeTitle}>Τι χρειάζεσαι σήμερα;</Text>
+                  <Text style={st.homeGreet}>{t('goodMorning')}</Text>
+                  <Text style={st.homeTitle}>{t('whatDoYouNeedToday')}</Text>
                 </View>
                 <View style={{flexDirection:'row', gap: S.sm, alignItems:'center'}}>
+                  <LanguageToggle style={st.cartBtn}/>
                   <TouchableOpacity style={st.cartBtn} onPress={()=>setShowInfo(true)}>
                     <Text style={{fontSize:22}}>ℹ️</Text>
                   </TouchableOpacity>
@@ -1675,14 +1688,14 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
               {/* Frequent */}
               <View style={{marginTop:S.xl,marginBottom:S.lg}}>
                 <View style={st.secRow}>
-                  <Text style={st.secTitle}>⭐ Συχνά αγοραζόμενα</Text>
-                  <TouchableOpacity onPress={()=>goTab('frequent')}><Text style={st.secLink}>Όλα →</Text></TouchableOpacity>
+                  <Text style={st.secTitle}>{t('frequentlyBought')}</Text>
+                  <TouchableOpacity onPress={()=>goTab('frequent')}><Text style={st.secLink}>{t('allArrow')}</Text></TouchableOpacity>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:S.xl,gap:S.sm}} keyboardShouldPersistTaps="handled">
                   {frequentItems.slice(0,8).map((item,i)=>(
                     <TouchableOpacity key={i} style={st.freqChip} onPress={()=>promptAddToList(item.name,item.catId)} activeOpacity={0.75}>
                       <Text style={{fontSize:15}}>{item.emoji}</Text>
-                      <Text style={{fontSize:12,fontWeight:'500',color:C.tx,maxWidth:80}} numberOfLines={1}>{item.name}</Text>
+                      <Text style={{fontSize:12,fontWeight:'500',color:C.tx,maxWidth:80}} numberOfLines={1}>{td(item.name)}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -1690,9 +1703,9 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
 
               {/* Categories */}
               <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingHorizontal:S.xl,marginBottom:S.md}}>
-                <Text style={st.secTitle}>📦 Κατηγορίες</Text>
+                <Text style={st.secTitle}>{t('categoriesIcon')}</Text>
                 <TouchableOpacity onPress={()=>setShowAddCategory(true)} style={st.addCatBtn}>
-                  <Text style={st.addCatBtnTx}>＋ Νέα</Text>
+                  <Text style={st.addCatBtnTx}>{t('plusNew')}</Text>
                 </TouchableOpacity>
               </View>
               <View style={st.catGrid}>
@@ -1708,11 +1721,11 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                         } else {
                           // Default categories: only allow rename via same modal but no delete
                           Alert.alert(
-                            cat.name,
-                            'Τι θέλεις να κάνεις;',
+                            tc(cat.id, cat.name),
+                            t('whatDoYouWantToDo'),
                             [
-                              { text: 'Άκυρο', style: 'cancel' },
-                              { text: '✏️ Μετονομασία', onPress: () => setEditCategoryTarget(cat) },
+                              { text: t('cancel'), style: 'cancel' },
+                              { text: t('renameIcon'), onPress: () => setEditCategoryTarget(cat) },
                             ]
                           );
                         }
@@ -1721,9 +1734,9 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                       delayLongPress={600}
                     >
                       <Text style={{fontSize:30,marginBottom:S.sm}}>{cat.emoji}</Text>
-                      <Text style={{fontSize:13,fontWeight:'700',color:C.tx,marginBottom:2}} numberOfLines={2}>{cat.name}</Text>
-                      <Text style={{fontSize:11,fontWeight:'500',color:cat.accent}}>{count} είδη</Text>
-                      {cat.isCustom && <Text style={{fontSize:9,color:cat.accent,marginTop:2}}>✎ δική σου</Text>}
+                      <Text style={{fontSize:13,fontWeight:'700',color:C.tx,marginBottom:2}} numberOfLines={2}>{tc(cat.id, cat.name)}</Text>
+                      <Text style={{fontSize:11,fontWeight:'500',color:cat.accent}}>{count} {t('itemsWord')}</Text>
+                      {cat.isCustom && <Text style={{fontSize:9,color:cat.accent,marginTop:2}}>{t('yourOwnEdit')}</Text>}
                     </TouchableOpacity>
                   );
                 })}
@@ -1740,8 +1753,8 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
               <View style={[st.listHdr, {backgroundColor: C.primary, paddingTop: insets.top + S.lg}]}>
                 <View style={st.listHdrRow}>
                   <View>
-                    <Text style={st.listTitle}>🛒 Η Λίστα μου</Text>
-                    <Text style={st.listSub}>{checkedCount}/{listCount} ολοκληρωμένα</Text>
+                    <Text style={st.listTitle}>{t('myListIcon')}</Text>
+                    <Text style={st.listSub}>{checkedCount}/{listCount} {t('completedWord')}</Text>
                   </View>
                   <View style={{flexDirection:'row', gap: S.sm}}>
                     {/* PDF Menu */}
@@ -1749,7 +1762,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                       <Text style={{fontSize:20}}>{pdfLoading ? '⏳' : '📄'}</Text>
                     </TouchableOpacity>
                     {listCount>0&&(
-                      <TouchableOpacity style={st.trashBtn} onPress={()=>Alert.alert('Εκκαθάριση','Να διαγραφούν όλα;',[{text:'Άκυρο',style:'cancel'},{text:'Ναι',style:'destructive',onPress:()=>setListItems([])}])}>
+                      <TouchableOpacity style={st.trashBtn} onPress={()=>Alert.alert(t('clearTitle'),t('deleteAllQuestion'),[{text:t('cancel'),style:'cancel'},{text:t('yes'),style:'destructive',onPress:()=>setListItems([])}])}>
                         <Text style={{fontSize:20}}>🗑️</Text>
                       </TouchableOpacity>
                     )}
@@ -1760,10 +1773,10 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                     <View style={st.progressTrack}><View style={[st.progressFill,{width:`${progress*100}%`}]}/></View>
                     {checkedCount>0&&checkedCount<listCount&&(
                       <TouchableOpacity onPress={()=>setListItems(prev=>prev.filter(i=>!i.checked))}>
-                        <Text style={st.clearDoneTx}>Αφαίρεση ολοκληρωμένων</Text>
+                        <Text style={st.clearDoneTx}>{t('removeCompleted')}</Text>
                       </TouchableOpacity>
                     )}
-                    {checkedCount===listCount&&listCount>0&&<Text style={st.doneTx}>🎉 Τέλειωσες τα ψώνια!</Text>}
+                    {checkedCount===listCount&&listCount>0&&<Text style={st.doneTx}>{t('shoppingDoneCelebrate')}</Text>}
                   </View>
                 )}
               </View>
@@ -1771,9 +1784,9 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
               {listCount===0?(
                 <View style={st.emptyWrap}>
                   <Text style={st.emptyEmoji}>🛒</Text>
-                  <Text style={st.emptyTitle}>Η λίστα σου είναι άδεια</Text>
-                  <Text style={[st.emptySub,{marginBottom:S.xl}]}>Πρόσθεσε προϊόντα από τις κατηγορίες</Text>
-                  <TouchableOpacity style={st.emptyBtn} onPress={()=>goTab('home')}><Text style={st.emptyBtnTx}>Πήγαινε στις κατηγορίες</Text></TouchableOpacity>
+                  <Text style={st.emptyTitle}>{t('yourListIsEmpty')}</Text>
+                  <Text style={[st.emptySub,{marginBottom:S.xl}]}>{t('addProductsFromCategories')}</Text>
+                  <TouchableOpacity style={st.emptyBtn} onPress={()=>goTab('home')}><Text style={st.emptyBtnTx}>{t('goToCategories')}</Text></TouchableOpacity>
                 </View>
               ):(
                 <SectionList
@@ -1784,7 +1797,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                   renderSectionHeader={({section})=>(
                     <View style={[st.listSecHdr,{backgroundColor:section.color+'CC'}]}>
                       <Text style={{fontSize:14}}>{section.emoji}</Text>
-                      <Text style={st.listSecName}>{section.name}</Text>
+                      <Text style={st.listSecName}>{tc(section.id, section.name)}</Text>
                       <View style={[st.listSecBadge,{backgroundColor:section.accent}]}>
                         <Text style={{color:C.white,fontSize:10,fontWeight:'700'}}>{section.data.filter(i=>!i.checked).length}/{section.data.length}</Text>
                       </View>
@@ -1801,12 +1814,12 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                         {item.checked&&<Text style={{color:C.white,fontSize:14,fontWeight:'800'}}>✓</Text>}
                       </TouchableOpacity>
                       <View style={{flex:1}}>
-                        <Text style={[st.listItemName,item.checked&&st.listItemNameCkd]}>{item.name}</Text>
-                        {item.isWeighed&&item.kgAmount?<Text style={{fontSize:11,color:C.tx2,fontWeight:'500',marginTop:1}}>⚖️ {item.kgAmount>=1?`${item.kgAmount} kg`:`${(item.kgAmount*1000).toFixed(0)} g`}</Text>:item.isWeighed?<Text style={{fontSize:11,color:C.tx3,marginTop:1}}>⚖️ Ζύγιση</Text>:null}
+                        <Text style={[st.listItemName,item.checked&&st.listItemNameCkd]}>{td(item.name)}</Text>
+                        {item.isWeighed&&item.kgAmount?<Text style={{fontSize:11,color:C.tx2,fontWeight:'500',marginTop:1}}>⚖️ {item.kgAmount>=1?`${item.kgAmount} kg`:`${(item.kgAmount*1000).toFixed(0)} g`}</Text>:item.isWeighed?<Text style={{fontSize:11,color:C.tx3,marginTop:1}}>{t('weighing')}</Text>:null}
                         {item.checked&&item.price?<Text style={st.priceTag}>💰 {item.price}€{item.brand?` · ${item.brand}`:''}{item.market?` · ${item.market}`:''}</Text>:null}
                         {(priceHistory[item.name]||[]).length>0&&(
                           <TouchableOpacity onPress={()=>goPriceHistory(item.name)} hitSlop={{top:6,bottom:6,left:6,right:6}}>
-                            <Text style={st.histLink}>📊 Ιστορικό τιμών →</Text>
+                            <Text style={st.histLink}>{t('priceHistoryArrow')}</Text>
                           </TouchableOpacity>
                         )}
                       </View>
@@ -1829,8 +1842,8 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
           {screen==='frequent' && (
             <View style={{flex:1}}>
               <View style={[st.freqHdr, {backgroundColor: C.primary, paddingTop: insets.top + S.lg}]}>
-                <Text style={st.listTitle}>⭐ Συχνά αγοραζόμενα</Text>
-                <Text style={st.listSub}>Γρήγορη προσθήκη στη λίστα</Text>
+                <Text style={st.listTitle}>{t('frequentlyBought')}</Text>
+                <Text style={st.listSub}>{t('quickAddToList')}</Text>
               </View>
               <FlatList
                 data={frequentItems} keyExtractor={(item,i)=>`${item.name}_${i}`}
@@ -1842,8 +1855,8 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                     <View style={[st.freqCard, {backgroundColor: C.surface}]}>
                       <View style={[st.freqEmojiBox,{backgroundColor:cat?.color||'#F3E5F5'}]}><Text style={{fontSize:22}}>{item.emoji}</Text></View>
                       <View style={{flex:1}}>
-                        <Text style={st.freqName}>{item.name}</Text>
-                        <Text style={[st.freqCat,{color:cat?.accent||C.tx3}]}>{cat?.emoji} {cat?.name||'Άλλα'}</Text>
+                        <Text style={st.freqName}>{td(item.name)}</Text>
+                        <Text style={[st.freqCat,{color:cat?.accent||C.tx3}]}>{cat?.emoji} {cat?tc(cat.id,cat.name):t('otherCategory')}</Text>
                       </View>
                       {(usageCounts[item.name]||0)>0&&<View style={st.usageBadge}><Text style={st.usageTx}>{usageCounts[item.name]}x</Text></View>}
                       <TouchableOpacity style={st.freqAddBtn} onPress={()=>promptAddToList(item.name,item.catId)} activeOpacity={0.75}>
@@ -1883,7 +1896,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
               .filter(n => !matched.has(n))
               .map(n => ({ name: n, entries: priceHistory[n] }));
             if (uncategorized.length > 0) {
-              sections.push({ id:'other', name:'Άλλα', emoji:'🧩', color:'#F3E5F5', accent:'#9C27B0', data: uncategorized });
+              sections.push({ id:'other', name:t('otherCategory'), emoji:'🧩', color:'#F3E5F5', accent:'#9C27B0', data: uncategorized });
             }
 
             return (
@@ -1891,8 +1904,8 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                 <View style={[st.freqHdr, {backgroundColor: C.primary, paddingTop: insets.top + S.lg}]}>
                   <View style={{flexDirection:'row', alignItems:'center', justifyContent:'space-between'}}>
                     <View style={{flex:1}}>
-                      <Text style={st.listTitle}>📈 Ιστορικό Τιμών</Text>
-                      <Text style={st.listSub}>Όλες οι αγορές ανά κατηγορία</Text>
+                      <Text style={st.listTitle}>{t('priceHistoryIcon')}</Text>
+                      <Text style={st.listSub}>{t('allPurchasesByCategory')}</Text>
                     </View>
                     <TouchableOpacity
                       onPress={()=>setShowExpenseAnalysis(true)}
@@ -1900,15 +1913,15 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                       hitSlop={{top:10,bottom:10,left:10,right:10}}
                     >
                       <Text style={{fontSize:16}}>📊</Text>
-                      <Text style={{color:C.white, fontSize:12, fontWeight:'700'}}>Ανάλυση</Text>
+                      <Text style={{color:C.white, fontSize:12, fontWeight:'700'}}>{t('analysis')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
                 {sections.length === 0 ? (
                   <View style={st.emptyWrap}>
                     <Text style={st.emptyEmoji}>📊</Text>
-                    <Text style={st.emptyTitle}>Δεν υπάρχουν δεδομένα</Text>
-                    <Text style={st.emptySub}>Αγόρασε προϊόντα και καταχώρησε τιμές για να εμφανιστούν εδώ</Text>
+                    <Text style={st.emptyTitle}>{t('noData')}</Text>
+                    <Text style={st.emptySub}>{t('buyProductsToSeeHere')}</Text>
                   </View>
                 ) : (
                   <SectionList
@@ -1920,9 +1933,9 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                     renderSectionHeader={({ section }) => (
                       <View style={[st.listSecHdr, { backgroundColor: section.color + 'CC' }]}>
                         <Text style={{ fontSize: 16 }}>{section.emoji}</Text>
-                        <Text style={st.listSecName}>{section.name}</Text>
+                        <Text style={st.listSecName}>{tc(section.id, section.name)}</Text>
                         <View style={[st.listSecBadge, { backgroundColor: section.accent }]}>
-                          <Text style={{ color: C.white, fontSize: 10, fontWeight: '700' }}>{section.data.length} είδη</Text>
+                          <Text style={{ color: C.white, fontSize: 10, fontWeight: '700' }}>{section.data.length} {t('itemsWord')}</Text>
                         </View>
                       </View>
                     )}
@@ -1941,12 +1954,12 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                           onPress={() => goPriceHistory(item.name)}
                           onLongPress={() => {
                             Alert.alert(
-                              'Διαγραφή προϊόντος',
-                              `Να διαγραφεί όλο το ιστορικό για "${item.name}";`,
+                              t('deleteProductTitle'),
+                              t('deleteAllHistoryFor').replace('{name}', item.name),
                               [
-                                { text: 'Άκυρο', style: 'cancel' },
+                                { text: t('cancel'), style: 'cancel' },
                                 {
-                                  text: 'Διαγραφή',
+                                  text: t('delete'),
                                   style: 'destructive',
                                   onPress: () => setPriceHistory(ph => {
                                     const updated = { ...ph };
@@ -1961,11 +1974,11 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
                           delayLongPress={500}
                         >
                           <View style={{ flex: 1 }}>
-                            <Text style={st.historyProductName}>{item.name}</Text>
+                            <Text style={st.historyProductName}>{td(item.name)}</Text>
                             <Text style={st.historyProductSub}>
-                              {entries.length} αγορές · τελευταία: {lastEntry?.date || '—'}
+                              {entries.length} {t('purchasesWord')} · {t('lastColonLower')} {lastEntry?.date || '—'}
                             </Text>
-                            <Text style={{fontSize:9,color:C.tx3,marginTop:1}}>πάτησε παρατεταμένα για διαγραφή</Text>
+                            <Text style={{fontSize:9,color:C.tx3,marginTop:1}}>{t('longPressToDelete')}</Text>
                           </View>
                           <View style={{ alignItems: 'flex-end', gap: 2 }}>
                             {lastShelf && lastPrice && lastShelf !== lastPrice ? (
@@ -1993,17 +2006,17 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
           {/* TAB BAR */}
           <View style={[st.tabBar, {backgroundColor: C.surface, borderTopColor: C.border, height: 72 + insets.bottom, paddingBottom: 8 + insets.bottom}]}>
             {[
-              {id:'home',emoji:'🏠',label:'Αρχική'},
-              {id:'list',emoji:'🛒',label:'Λίστα',badge:listCount},
-              {id:'frequent',emoji:'⭐',label:'Συχνά'},
-              {id:'history',emoji:'📈',label:'Ιστορικό'},
-            ].map(t=>(
-              <TouchableOpacity key={t.id} style={[st.tabItem,screen===t.id&&st.tabItemOn]} onPress={()=>goTab(t.id)}>
+              {id:'home',emoji:'🏠',label:t('home')},
+              {id:'list',emoji:'🛒',label:t('list'),badge:listCount},
+              {id:'frequent',emoji:'⭐',label:t('frequent')},
+              {id:'history',emoji:'📈',label:t('history')},
+            ].map(tab=>(
+              <TouchableOpacity key={tab.id} style={[st.tabItem,screen===tab.id&&st.tabItemOn]} onPress={()=>goTab(tab.id)}>
                 <View style={{position:'relative'}}>
-                  <Text style={{fontSize:22,marginBottom:2}}>{t.emoji}</Text>
-                  {t.badge>0&&<View style={st.tabBadge}><Text style={st.tabBadgeTx}>{t.badge>99?'99+':t.badge}</Text></View>}
+                  <Text style={{fontSize:22,marginBottom:2}}>{tab.emoji}</Text>
+                  {tab.badge>0&&<View style={st.tabBadge}><Text style={st.tabBadgeTx}>{tab.badge>99?'99+':tab.badge}</Text></View>}
                 </View>
-                <Text style={[st.tabLabel,screen===t.id&&st.tabLabelOn]}>{t.label}</Text>
+                <Text style={[st.tabLabel,screen===tab.id&&st.tabLabelOn]}>{tab.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -2011,31 +2024,31 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
       )}
 
       {/* ══ MODALS ══ */}
-      <AddModal visible={showAddCatalog} onClose={()=>setShowAddCatalog(false)} onSave={({name})=>{ if(activeCatId) addCatalogProduct(activeCatId,name); }} title={activeCat?`Νέο προϊόν — ${activeCat.name}`:'Νέο προϊόν'}/>
-      <AddModal visible={showAddList} onClose={()=>setShowAddList(false)} onSave={({name,catId})=>addToList(name,catId)} title="Προσθήκη στη λίστα" showCat initCatId="other"/>
-      <AddModal visible={!!editCatalogItem} onClose={()=>setEditCatalogItem(null)} onSave={({name})=>{ if(editCatalogItem&&activeCatId) editCatalogProduct(activeCatId,editCatalogItem.id,name); setEditCatalogItem(null); }} initName={editCatalogItem?.name||''} title="Επεξεργασία προϊόντος" mode="edit"/>
-      <AddModal visible={!!editListItem_} onClose={()=>setEditListItem(null)} onSave={({name})=>{ if(editListItem_) editListItemFn(editListItem_.id,name); setEditListItem(null); }} initName={editListItem_?.name||''} title="Επεξεργασία" mode="edit"/>
+      <AddModal visible={showAddCatalog} onClose={()=>setShowAddCatalog(false)} onSave={({name})=>{ if(activeCatId) addCatalogProduct(activeCatId,name); }} title={activeCat?`${t('newProductFor')} — ${tc(activeCat.id, activeCat.name)}`:t('newProduct')} allCategories={allCategories}/>
+      <AddModal visible={showAddList} onClose={()=>setShowAddList(false)} onSave={({name,catId})=>addToList(name,catId)} title={t('addToList')} showCat initCatId="other" allCategories={allCategories}/>
+      <AddModal visible={!!editCatalogItem} onClose={()=>setEditCatalogItem(null)} onSave={({name})=>{ if(editCatalogItem&&activeCatId) editCatalogProduct(activeCatId,editCatalogItem.id,name); setEditCatalogItem(null); }} initName={editCatalogItem?td(editCatalogItem.name):''} title={t('editProduct')} mode="edit" allCategories={allCategories}/>
+      <AddModal visible={!!editListItem_} onClose={()=>setEditListItem(null)} onSave={({name})=>{ if(editListItem_) editListItemFn(editListItem_.id,name); setEditListItem(null); }} initName={editListItem_?td(editListItem_.name):''} title={t('edit')} mode="edit" allCategories={allCategories}/>
 
       <ActionSheet
         visible={!!actionItem&&actionContext==='catalog'}
         onClose={()=>{ setActionItem(null); setActionContext(null); }}
-        title={actionItem?.name||''}
+        title={actionItem?td(actionItem.name):''}
         actions={[
-          {icon:isInList(actionItem?.id)?'✓':'+',label:isInList(actionItem?.id)?'Ήδη στη λίστα':'Προσθήκη στη λίστα',onPress:()=>{ if(actionItem) promptAddToList(actionItem.name,actionItem.catId,actionItem.id); },disabled:isInList(actionItem?.id)},
-          {icon:'✏️',label:'Επεξεργασία',onPress:()=>setEditCatalogItem(actionItem)},
-          {icon:'🗑️',label:'Διαγραφή από κατηγορία',danger:true,onPress:()=>{ if(actionItem&&activeCatId) delCatalogProduct(activeCatId,actionItem.id); }},
+          {icon:isInList(actionItem?.id)?'✓':'+',label:isInList(actionItem?.id)?t('alreadyInList'):t('addToList'),onPress:()=>{ if(actionItem) promptAddToList(actionItem.name,actionItem.catId,actionItem.id); },disabled:isInList(actionItem?.id)},
+          {icon:'✏️',label:t('edit'),onPress:()=>setEditCatalogItem(actionItem)},
+          {icon:'🗑️',label:t('deleteFromCategory'),danger:true,onPress:()=>{ if(actionItem&&activeCatId) delCatalogProduct(activeCatId,actionItem.id); }},
         ]}
       />
 
       <ActionSheet
         visible={!!actionItem&&actionContext==='list'}
         onClose={()=>{ setActionItem(null); setActionContext(null); }}
-        title={actionItem?.name||''}
+        title={actionItem?td(actionItem.name):''}
         actions={[
-          {icon:'📊',label:'Ιστορικό τιμών',onPress:()=>{ if(actionItem) goPriceHistory(actionItem.name); }},
-          {icon:actionItem?.checked?'↩️':'✓',label:actionItem?.checked?'Ξεμάρκαρε':'Σήμανση ως αγοράστηκε',onPress:()=>{ if(actionItem) handleTapCheck(actionItem); }},
-          {icon:'✏️',label:'Επεξεργασία',onPress:()=>setEditListItem(actionItem)},
-          {icon:'🗑️',label:'Διαγραφή',danger:true,onPress:()=>{ if(actionItem) delListItemFn(actionItem.id); }},
+          {icon:'📊',label:t('priceHistory'),onPress:()=>{ if(actionItem) goPriceHistory(actionItem.name); }},
+          {icon:actionItem?.checked?'↩️':'✓',label:actionItem?.checked?t('uncheck'):t('markAsPurchased'),onPress:()=>{ if(actionItem) handleTapCheck(actionItem); }},
+          {icon:'✏️',label:t('edit'),onPress:()=>setEditListItem(actionItem)},
+          {icon:'🗑️',label:t('delete'),danger:true,onPress:()=>{ if(actionItem) delListItemFn(actionItem.id); }},
         ]}
       />
 
@@ -2043,7 +2056,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
         visible={!!priceModalItem}
         onClose={()=>setPriceModalItem(null)}
         onSave={({price,brand,market,hasOffer,offerType,offerValue,paidPrice,shelfPrice,isWeighed,pricePerKg,weightKg})=>{ if(priceModalItem) checkWithPrice(priceModalItem.id,price,brand,market,hasOffer,offerType,offerValue,paidPrice,shelfPrice,isWeighed,pricePerKg,weightKg); setPriceModalItem(null); }}
-        itemName={priceModalItem?.name||''}
+        itemName={priceModalItem?td(priceModalItem.name):''}
         lastEntry={priceModalItem?(priceHistory[priceModalItem.name]||[])[0]:null}
       />
 
@@ -2066,11 +2079,11 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
         }}
         onDelete={editCategoryTarget?.isCustom ? () => {
           Alert.alert(
-            'Διαγραφή κατηγορίας',
-            `Να διαγραφεί η κατηγορία "${editCategoryTarget?.name}"; Θα διαγραφούν και τα προϊόντα της.`,
+            t('deleteCategoryTitleAlert'),
+            t('deleteCategoryConfirmMsg').replace('{name}', editCategoryTarget?.name),
             [
-              { text: 'Άκυρο', style: 'cancel' },
-              { text: 'Διαγραφή', style: 'destructive', onPress: () => { deleteCustomCategory(editCategoryTarget.id); setEditCategoryTarget(null); } },
+              { text: t('cancel'), style: 'cancel' },
+              { text: t('delete'), style: 'destructive', onPress: () => { deleteCustomCategory(editCategoryTarget.id); setEditCategoryTarget(null); } },
             ]
           );
         } : null}
@@ -2083,17 +2096,17 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
             <View style={st.modalHandle}/>
             <View style={{alignItems:'center', marginBottom: S.xl}}>
               <Image source={LOGO} style={{width:80,height:80,marginBottom:S.md}} resizeMode="contain"/>
-              <Text style={[st.modalTitle, {color:C.tx, fontSize:22, textAlign:'center'}]}>Λίστα Αγορών</Text>
-              <Text style={{fontSize:12, color:C.tx3, marginTop:4}}>Η έξυπνη εφαρμογή για τα ψώνια σου</Text>
+              <Text style={[st.modalTitle, {color:C.tx, fontSize:22, textAlign:'center'}]}>{t('appName')}</Text>
+              <Text style={{fontSize:12, color:C.tx3, marginTop:4}}>{t('smartShoppingApp')}</Text>
             </View>
 
             {[
-              {emoji:'🏠', title:'Αρχική', desc:'Δες όλες τις κατηγορίες και τα συχνά προϊόντα σου. Πάτα παρατεταμένα σε κατηγορία για μετονομασία.'},
-              {emoji:'🛒', title:'Λίστα', desc:'Η λίστα αγορών σου. Τσεκάρισε κάθε προϊόν μόλις το αγοράσεις και καταχώρησε τιμή, μάρκα και μάρκετ.'},
-              {emoji:'⭐', title:'Συχνά', desc:'Τα προϊόντα που αγοράζεις πιο συχνά εμφανίζονται εδώ αυτόματα για γρήγορη προσθήκη.'},
-              {emoji:'📈', title:'Ιστορικό', desc:'Δες τις τιμές που πλήρωσες για κάθε προϊόν ανά κατηγορία. Πάτα παρατεταμένα για διαγραφή.'},
-              {emoji:'🏷️', title:'Προσφορές', desc:'Όταν τσεκάρεις προϊόν, μπορείς να καταχωρήσεις προσφορά σε € ή %. Η τιμή ραφιού υπολογίζεται αυτόματα.'},
-              {emoji:'📁', title:'Δικές σου κατηγορίες', desc:'Δημιούργησε τις δικές σου κατηγορίες πατώντας το "＋ Νέα" δίπλα στις κατηγορίες.'},
+              {emoji:'🏠', title:t('home'), desc:t('helpHomeDesc')},
+              {emoji:'🛒', title:t('list'), desc:t('helpListDesc')},
+              {emoji:'⭐', title:t('frequent'), desc:t('helpFrequentDesc')},
+              {emoji:'📈', title:t('history'), desc:t('helpHistoryDesc')},
+              {emoji:'🏷️', title:t('offers'), desc:t('offerHelpDesc')},
+              {emoji:'📁', title:t('yourCategories'), desc:t('createOwnCategoriesDesc')},
             ].map((item, i) => (
               <View key={i} style={{flexDirection:'row', gap:S.md, marginBottom:S.md}}>
                 <Text style={{fontSize:22, width:32}}>{item.emoji}</Text>
@@ -2105,7 +2118,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
             ))}
 
             <TouchableOpacity style={[st.saveBtn, {marginTop:S.md}]} onPress={()=>setShowInfo(false)}>
-              <Text style={st.saveTx}>Κατάλαβα! 👍</Text>
+              <Text style={st.saveTx}>{t('gotIt')}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -2157,7 +2170,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
             <View style={[{backgroundColor: C.surface, borderRadius: R.xl, overflow:'hidden', marginBottom: S.sm}]}>
               <View style={[{backgroundColor: C.surfaceAlt, padding: S.md, alignItems:'center'}]}>
                 <Text style={{fontSize: 12, fontWeight:'600', color: C.tx2, textTransform:'uppercase', letterSpacing:0.5}}>
-                  📄 PDF Λίστας
+                  {t('pdfListIcon')}
                 </Text>
               </View>
 
@@ -2169,8 +2182,8 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
               >
                 <Text style={{fontSize: 24, width: 32}}>📄</Text>
                 <View style={{flex:1}}>
-                  <Text style={{fontSize: 15, fontWeight:'600', color: C.tx}}>Εξαγωγή σε PDF</Text>
-                  <Text style={{fontSize: 12, color: C.tx3, marginTop: 2}}>Για εκτύπωση ή κοινοποίηση</Text>
+                  <Text style={{fontSize: 15, fontWeight:'600', color: C.tx}}>{t('exportToPdf')}</Text>
+                  <Text style={{fontSize: 12, color: C.tx3, marginTop: 2}}>{t('forPrintOrShare')}</Text>
                 </View>
               </TouchableOpacity>
 
@@ -2184,8 +2197,8 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
               >
                 <Text style={{fontSize: 24, width: 32}}>💾</Text>
                 <View style={{flex:1}}>
-                  <Text style={{fontSize: 15, fontWeight:'600', color: C.tx}}>Αποθήκευση λίστας (.json)</Text>
-                  <Text style={{fontSize: 12, color: C.tx3, marginTop: 2}}>Αποθήκευση για εισαγωγή αργότερα</Text>
+                  <Text style={{fontSize: 15, fontWeight:'600', color: C.tx}}>{t('saveListJson')}</Text>
+                  <Text style={{fontSize: 12, color: C.tx3, marginTop: 2}}>{t('saveForLaterImport')}</Text>
                 </View>
               </TouchableOpacity>
 
@@ -2199,8 +2212,8 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
               >
                 <Text style={{fontSize: 24, width: 32}}>📥</Text>
                 <View style={{flex:1}}>
-                  <Text style={{fontSize: 15, fontWeight:'600', color: C.tx}}>Εισαγωγή λίστας</Text>
-                  <Text style={{fontSize: 12, color: C.tx3, marginTop: 2}}>Άνοιγμα αποθηκευμένης λίστας (.json)</Text>
+                  <Text style={{fontSize: 15, fontWeight:'600', color: C.tx}}>{t('importList')}</Text>
+                  <Text style={{fontSize: 12, color: C.tx3, marginTop: 2}}>{t('openSavedListJson')}</Text>
                 </View>
               </TouchableOpacity>
 
@@ -2208,7 +2221,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
 
               <View style={[{backgroundColor: C.surfaceAlt, padding: S.md, alignItems:'center'}]}>
                 <Text style={{fontSize: 12, fontWeight:'600', color: C.tx2, textTransform:'uppercase', letterSpacing:0.5}}>
-                  🗂️ Backup Ρυθμίσεων
+                  {t('backupSettingsIcon')}
                 </Text>
               </View>
 
@@ -2220,8 +2233,8 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
               >
                 <Text style={{fontSize: 24, width: 32}}>📤</Text>
                 <View style={{flex:1}}>
-                  <Text style={{fontSize: 15, fontWeight:'600', color: C.tx}}>Εξαγωγή Backup</Text>
-                  <Text style={{fontSize: 12, color: C.tx3, marginTop: 2}}>Κατηγορίες, προϊόντα & ιστορικό τιμών</Text>
+                  <Text style={{fontSize: 15, fontWeight:'600', color: C.tx}}>{t('exportBackup')}</Text>
+                  <Text style={{fontSize: 12, color: C.tx3, marginTop: 2}}>{t('categoriesProductsHistory')}</Text>
                 </View>
               </TouchableOpacity>
 
@@ -2235,13 +2248,13 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
               >
                 <Text style={{fontSize: 24, width: 32}}>📲</Text>
                 <View style={{flex:1}}>
-                  <Text style={{fontSize: 15, fontWeight:'600', color: C.tx}}>Επαναφορά Backup</Text>
-                  <Text style={{fontSize: 12, color: C.tx3, marginTop: 2}}>Σε νέα συσκευή, από αποθηκευμένο αρχείο</Text>
+                  <Text style={{fontSize: 15, fontWeight:'600', color: C.tx}}>{t('restoreBackup')}</Text>
+                  <Text style={{fontSize: 12, color: C.tx3, marginTop: 2}}>{t('onNewDeviceFromFile')}</Text>
                 </View>
               </TouchableOpacity>
             </View>
             <TouchableOpacity style={[{backgroundColor: C.surface, borderRadius: R.lg, padding: S.md, alignItems:'center'}]} onPress={()=>setShowPdfMenu(false)}>
-              <Text style={{fontSize: 15, fontWeight:'700', color: C.tx}}>Άκυρο</Text>
+              <Text style={{fontSize: 15, fontWeight:'700', color: C.tx}}>{t('cancel')}</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -2252,7 +2265,7 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
         <View style={{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'rgba(0,0,0,0.4)',alignItems:'center',justifyContent:'center'}}>
           <View style={{backgroundColor: C.surface, borderRadius: R.lg, padding: S.xxl, alignItems:'center', gap: S.md}}>
             <ActivityIndicator size="large" color={C.primary}/>
-            <Text style={{color: C.tx, fontWeight:'600', fontSize:14}}>Παρακαλώ περίμενε...</Text>
+            <Text style={{color: C.tx, fontWeight:'600', fontSize:14}}>{t('pleaseWait')}</Text>
           </View>
         </View>
       )}
@@ -2264,7 +2277,9 @@ ${alreadyInList} ήταν ήδη στη λίστα.` : ''),
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ErrorBoundary><AppContent/></ErrorBoundary>
+      <LanguageProvider>
+        <ErrorBoundary><AppContent/></ErrorBoundary>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }
